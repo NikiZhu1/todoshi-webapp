@@ -1,12 +1,13 @@
 import React from 'react';
 import { Form, Input, Button, Typography, Divider } from 'antd';
-import { UserOutlined, LockOutlined, MailOutlined } from '@ant-design/icons';
+import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 
 const { Title, Text } = Typography;
 
 const AuthForm = ({ 
     title, 
+    subtitle,
     onFinish, 
     buttonText, 
     linkText, 
@@ -20,11 +21,38 @@ const AuthForm = ({
         console.log('Failed:', errorInfo);
     };
 
+    const titleStyle = {
+        textAlign: 'center',
+        marginBottom: 6,
+        marginTop: 0,
+    };
+
+    const subtitleStyle = {
+        display: 'block',
+        textAlign: 'center',
+        marginBottom: 18,
+        color: '#595959',
+    };
+
+    const dividerStyle = {
+        margin: '16px 0 12px',
+    };
+
+    const linkWrapStyle = {
+        textAlign: 'center',
+    };
+
+    const linkStyle = {
+        color: '#232323',
+        fontWeight: 600,
+    };
+
     return (
-        <div style={{ width: '100%' }}>
-            <Title level={3} style={{ textAlign: 'center', marginBottom: 24 }}>
+        <div style={{ width: '100%', animation: '0.55s ease' }}>
+            <Title level={3} style={titleStyle}>
                 {title}
             </Title>
+            {subtitle && <Text style={subtitleStyle}>{subtitle}</Text>}
             
             <Form
                 form={form}
@@ -95,18 +123,18 @@ const AuthForm = ({
                         loading={loading}
                         size="large"
                         block
-                        style={{ marginTop: 8 }}
+                        // style={submitButtonStyle}
                     >
                         {buttonText}
                     </Button>
                 </Form.Item>
             </Form>
 
-            <Divider style={{ margin: '16px 0' }} />
+            <Divider style={dividerStyle} />
             
-            <div style={{ textAlign: 'center' }}>
+            <div style={linkWrapStyle}>
                 <Text>
-                    <Link to={linkTo}>{linkText}</Link>
+                    <Link to={linkTo} style={linkStyle}>{linkText}</Link>
                 </Text>
             </div>
         </div>

@@ -1,6 +1,5 @@
 import apiClient from './.ApiClient.jsx';
 import { jwtDecode } from 'jwt-decode';
-import Cookies from 'js-cookie';
 
 export const AuthenticateUser = async (values, isRegistration) => {
     try {
@@ -83,11 +82,7 @@ export const getUserByUsername = async (username) => {
     }
 };
 
-export const updateUserData = async (token, userId, userData) => {
-    if (!token) {
-        throw new Error('Требуется авторизация');
-    }
-
+export const updateUserData = async (userId, userData) => {
     try {
         const payload = {};
         
@@ -112,12 +107,7 @@ export const updateUserData = async (token, userId, userData) => {
             data: payload
         });
 
-        const response = await apiClient.put(`/user/${userId}`, payload, {
-            headers: { 
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
-        });
+        const response = await apiClient.put(`/user/${userId}`, payload);
         
         console.log('Успешный ответ от сервера:', response.data);
         return response.data;
