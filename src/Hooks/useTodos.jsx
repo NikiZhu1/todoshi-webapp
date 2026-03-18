@@ -24,7 +24,7 @@ export const useTodos = () => {
     /** Получить Todo */
     const getTodo = (id) => 
         execute(async () => {
-            const todoData = api.GetTodo(id);
+            const todoData = await api.GetTodo(id);
             return todoData;
     });
 
@@ -40,14 +40,14 @@ export const useTodos = () => {
     const createTodo = (todoData) => 
         execute(async () => {
             const newTodo = await api.AddTodo(todoData);
-            setUserTodos(prev => [...prev, newTodo]);
+            setUserTodos(prev => [...(prev ?? []), newTodo]);
             return newTodo;
     });
 
     /** Изменить */ 
     const updateTodo = (id, newTodoData) =>
         execute(async () => {
-            const response = api.UpdateTodo(id, newTodoData)
+            const response = await api.UpdateTodo(id, newTodoData);
             setUserTodos((prev) =>
                 (prev ?? []).map((todo) =>
                     todo?.id === id ? { ...todo, ...newTodoData } : todo
@@ -71,6 +71,8 @@ export const useTodos = () => {
             return response;
     });
 
+    const planTodos = planTodo;
+
 
     return {
         loading,
@@ -82,5 +84,6 @@ export const useTodos = () => {
         updateTodo,
         deleteTodo,
         planTodo,
+        planTodos,
     };
 };

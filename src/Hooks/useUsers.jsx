@@ -123,7 +123,7 @@ export const useUsers = () => {
                 password: newPassword
             };
             
-            const response = await api.updateUserData(token, userId, updateData);
+            const response = await api.updateUserData(userId, updateData);
             return response;
         } catch (err) {
             console.error('Ошибка при смене пароля:', err);
@@ -147,7 +147,7 @@ export const useUsers = () => {
                 userName: newUsername
             };
             
-            const response = await api.updateUserData(token, userId, updateData);
+            const response = await api.updateUserData(userId, updateData);
             return response;
         } catch (err) {
             console.error('Ошибка при смене логина:', err);

@@ -35,7 +35,7 @@ export const GetUserScheduledTasks = async (userId) => {
 }
 
 export const GetScheduledTasksByTodo = async (todoId) => {
-    if (!userId)
+    if (!todoId)
         throw new Error('id задачи обязателен');
 
     try {
@@ -78,7 +78,7 @@ export const AddScheduledTask = async (taskId, startTime, endTime) => {
     }
 }
 
-export const UpdateScheduledTask = async (taskId, startTime, endTime) => {
+export const UpdateScheduledTask = async (id, taskId, startTime, endTime) => {
     if (!id)
         throw new Error('id задачи обязателен');
 

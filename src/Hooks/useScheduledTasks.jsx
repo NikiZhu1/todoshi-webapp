@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import * as api from '../API Methods/scheduledTaskMethods'; 
+import * as api from '../API Methods/scheduledTaskMethods.jsx'; 
 
-export const useTodos = () => {
+export const useScheduledTasks = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
-    const [userScheduledTask, setScheduledTask] = useState();
+    const [userScheduledTasks, setScheduledTasks] = useState([]);
 
     const execute = async (callback) => {
         setLoading(true);
@@ -24,33 +24,33 @@ export const useTodos = () => {
     /** Получить Todo */
     const getTask = (id) => 
         execute(async () => {
-            const todoData = api.GetScheduledTask(id);
-            return todoData;
+            const taskData = await api.GetScheduledTask(id);
+            return taskData;
     });
 
     /** Получить задачи пользователя */ 
     const getUserTasks = (userId) =>
         execute(async () => {
-            const todoData = await api.GetUserScheduledTasks(userId);
-            setScheduledTask(todoData);
-            return todoData;
+            const taskData = await api.GetUserScheduledTasks(userId);
+            setScheduledTasks(taskData ?? []);
+            return taskData;
     });
 
     /** Создать */ 
-    const createTask = (todoData) => 
+    const createTask = (taskId, startTime, endTime) => 
         execute(async () => {
-            const newTask = await api.AddScheduledTask(todoData);
-            setScheduledTask(prev => [...prev, newTask]);
+            const newTask = await api.AddScheduledTask(taskId, startTime, endTime);
+            setScheduledTasks(prev => [...(prev ?? []), newTask]);
             return newTask;
     });
 
     /** Изменить */ 
-    const updateTask = (id, startTime, endTime) =>
+    const updateTask = (id, taskId, startTime, endTime) =>
         execute(async () => {
-            const response = api.UpdateScheduledTask(id, startTime, endTime)
-            setScheduledTask((prev) =>
+            const response = await api.UpdateScheduledTask(id, taskId, startTime, endTime);
+            setScheduledTasks((prev) =>
                 (prev ?? []).map((task) =>
-                    task?.id === id ? { ...task, ...{taskId: id, startTime: startTime, endTime: endTime}} : task
+                    task?.id === id ? { ...task, taskId, startTime, endTime } : task
                 )
             );
             return response;
@@ -59,15 +59,15 @@ export const useTodos = () => {
     /** Удалить */ 
     const deleteTask = (id) => 
         execute(async () => {
-            const responce = await api.DeleteScheduledTask(id);
-            setScheduledTask((prev) => (prev ?? []).filter((task) => task?.id !== id));
-            return responce;
+            const response = await api.DeleteScheduledTask(id);
+            setScheduledTasks((prev) => (prev ?? []).filter((task) => task?.id !== id));
+            return response;
     });
 
     return {
         loading,
         error,
-        userScheduledTask,
+        userScheduledTasks,
         getTask,
         getUserTasks,
         createTask,

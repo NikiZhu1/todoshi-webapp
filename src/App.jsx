@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ConfigProvider } from 'antd';
+import ruRU from 'antd/locale/ru_RU';
 import Base from './Pages/Base';
 
 import Login from './Pages/Login';
@@ -10,6 +11,7 @@ import DayBoundsSetup from './Pages/DayBoundsSetup';
 function App() {
   return (
         <ConfigProvider
+            locale={ruRU}
             theme={{
                 token: {
                     fontFamily: `'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif`,
