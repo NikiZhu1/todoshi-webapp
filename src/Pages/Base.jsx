@@ -19,6 +19,9 @@ import {
     Tag,
     message,
     Flex,
+    Typography,
+    Splitter,
+    Divider,
 } from 'antd';
 
 import TasksPanel from '../Components/TasksPanel';
@@ -29,17 +32,21 @@ import { useScheduledTasks } from '../Hooks/useScheduledTasks';
 import { useTimePlans } from '../Hooks/useTimePlans';
 
 const { TextArea } = Input;
+const { Title, Text } = Typography;
 
 function Base() {
     const navigate = useNavigate();
     const [isCreateTodoModalOpen, setIsCreateTodoModalOpen] = useState(false);
     const [isEditTodoModalOpen, setIsEditTodoModalOpen] = useState(false);
+    const [isScheduledEventModalOpen, setIsScheduledEventModalOpen] = useState(false);
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
     const [currentUserId, setCurrentUserId] = useState(null);
     const [selectedTodo, setSelectedTodo] = useState(null);
+    const [selectedScheduledEvent, setSelectedScheduledEvent] = useState(null);
 
     const [createTodoForm] = Form.useForm();
     const [editTodoForm] = Form.useForm();
+    const [scheduledEventForm] = Form.useForm();
     const [settingsForm] = Form.useForm();
     const selectedColor = Form.useWatch('color', createTodoForm);
     const selectedEditColor = Form.useWatch('color', editTodoForm);
@@ -60,6 +67,8 @@ function Base() {
         loading: scheduledTasksLoading,
         userScheduledTasks,
         getUserTasks,
+        updateTask,
+        deleteTask,
     } = useScheduledTasks();
 
     const {
@@ -78,6 +87,11 @@ function Base() {
 
     const pageLoading = todosLoading || scheduledTasksLoading || usersLoading || plansLoading;
     const dayLabels = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+    const priorityLabels = {
+        0: 'Высокий',
+        1: 'Средний',
+        2: 'Низкий',
+    };
 
     //Информация о плане
     const getPlanSlotsInfo = (plan) => {
@@ -249,6 +263,15 @@ function Base() {
         ...overrides,
     });
 
+    const getDurationMinutes = (startIso, endIso) => {
+        if (!startIso || !endIso) {
+            return null;
+        }
+
+        const diff = dayjs(endIso).diff(dayjs(startIso), 'minute');
+        return diff > 0 ? diff : null;
+    };
+
     const handlePlanTodos = async () => {
         try {
             await planTodos();
@@ -358,6 +381,170 @@ function Base() {
         }
     };
 
+    const handleCalendarEventDrop = async (info) => {
+        const scheduled = info.event.extendedProps?.scheduledTask;
+        const task = info.event.extendedProps?.task;
+        const start = info.event.start?.toISOString();
+        const end = info.event.end?.toISOString();
+
+        if (!scheduled?.id || !task?.id || !start || !end) {
+            info.revert();
+            return;
+        }
+
+        try {
+            await updateTask(scheduled.id, scheduled.taskId ?? task.id, start, end);
+            await updateTodo(task.id, buildTodoPayload(task, { isPinned: true }));
+            await refreshMainData();
+            message.success('Событие перемещено');
+        } catch (error) {
+            info.revert();
+            console.error('Ошибка при переносе события:', error);
+            message.error('Не удалось переместить событие');
+        }
+    };
+
+    const handleCalendarEventResize = async (info) => {
+        const scheduled = info.event.extendedProps?.scheduledTask;
+        const task = info.event.extendedProps?.task;
+        const start = info.event.start?.toISOString();
+        const end = info.event.end?.toISOString();
+
+        if (!scheduled?.id || !task?.id || !start || !end) {
+            info.revert();
+            return;
+        }
+
+        const newDuration = getDurationMinutes(start, end);
+
+        try {
+            await updateTask(scheduled.id, scheduled.taskId ?? task.id, start, end);
+            await updateTodo(
+                task.id,
+                buildTodoPayload(task, {
+                    isPinned: true,
+                    estimatedDurationMinutes: newDuration ?? task?.estimatedDurationMinutes,
+                })
+            );
+            await refreshMainData();
+            message.success('Длительность события обновлена');
+        } catch (error) {
+            info.revert();
+            console.error('Ошибка при изменении длительности события:', error);
+            message.error('Не удалось изменить длительность');
+        }
+    };
+
+    //при нажатии на событие в календаре
+    const handleCalendarEventClick = (info) => {
+        const scheduled = info.event.extendedProps?.scheduledTask;
+        const task = info.event.extendedProps?.task;
+
+        if (!scheduled?.id || !task?.id) {
+            return;
+        }
+
+        const start = info.event.start;
+        const fallbackEnd = start
+            ? dayjs(start).add(task?.estimatedDurationMinutes ?? 30, 'minute')
+            : null;
+        const end = info.event.end ? dayjs(info.event.end) : fallbackEnd;
+
+        setSelectedScheduledEvent({
+            scheduledTaskId: scheduled.id,
+            taskId: task.id,
+            task,
+        });
+
+        scheduledEventForm.setFieldsValue({
+            isPinned: Boolean(task?.isPinned),
+            isSplittable: Boolean(task?.isSplittable),
+            startTime: start ? dayjs(start) : null,
+            endTime: end,
+        });
+
+        setIsScheduledEventModalOpen(true);
+    };
+
+    const handleOpenTaskEditFromEvent = () => {
+        if (!selectedScheduledEvent?.task) {
+            return;
+        }
+
+        const task = selectedScheduledEvent.task;
+        setIsScheduledEventModalOpen(false);
+        setSelectedScheduledEvent(null);
+        scheduledEventForm.resetFields();
+        handleOpenTodoDetails(task);
+    };
+
+    const handleSaveScheduledEvent = async () => {
+        if (!selectedScheduledEvent?.scheduledTaskId || !selectedScheduledEvent?.taskId) {
+            return;
+        }
+
+        try {
+            const values = await scheduledEventForm.validateFields();
+            const start = values.startTime?.toISOString();
+            const end = values.endTime?.toISOString();
+            const duration = getDurationMinutes(start, end);
+
+            await updateTask(
+                selectedScheduledEvent.scheduledTaskId,
+                selectedScheduledEvent.taskId,
+                start,
+                end
+            );
+
+            await updateTodo(
+                selectedScheduledEvent.taskId,
+                buildTodoPayload(selectedScheduledEvent.task, {
+                    isPinned: Boolean(values.isPinned),
+                    isSplittable: Boolean(values.isSplittable),
+                    estimatedDurationMinutes:
+                        duration ?? selectedScheduledEvent.task?.estimatedDurationMinutes,
+                })
+            );
+
+            setIsScheduledEventModalOpen(false);
+            setSelectedScheduledEvent(null);
+            scheduledEventForm.resetFields();
+            await refreshMainData();
+            message.success('Событие обновлено');
+        } catch (error) {
+            console.error('Ошибка при сохранении события:', error);
+            if (error?.errorFields) {
+                return;
+            }
+            message.error('Не удалось сохранить событие');
+        }
+    };
+
+    const handleDeleteScheduledEvent = async () => {
+        if (!selectedScheduledEvent?.scheduledTaskId || !selectedScheduledEvent?.taskId) {
+            return;
+        }
+
+        try {
+            await deleteTask(selectedScheduledEvent.scheduledTaskId);
+            await updateTodo(
+                selectedScheduledEvent.taskId,
+                buildTodoPayload(selectedScheduledEvent.task, {
+                    status: 0,
+                    isPinned: false,
+                })
+            );
+            setIsScheduledEventModalOpen(false);
+            setSelectedScheduledEvent(null);
+            scheduledEventForm.resetFields();
+            await refreshMainData();
+            message.success('Событие удалено');
+        } catch (error) {
+            console.error('Ошибка при удалении события:', error);
+            message.error('Не удалось удалить событие');
+        }
+    };
+
     const handleDeleteTodo = async () => {
         if (!selectedTodo?.id) {
             return;
@@ -421,6 +608,12 @@ function Base() {
         }
     };
 
+    const scheduledTaskInfo = selectedScheduledEvent?.task;
+    const scheduledPlanId = scheduledTaskInfo?.timePlanId ?? scheduledTaskInfo?.timePlan?.id;
+    const scheduledPlan = (userPlans ?? []).find((plan) => plan.id === scheduledPlanId);
+    const scheduledPriority = priorityLabels[scheduledTaskInfo?.priority] ?? 'Не задан';
+    const scheduledNotes = scheduledTaskInfo?.notes?.trim();
+
     return (
         <div
             style={{
@@ -436,6 +629,9 @@ function Base() {
                             tasks={userScheduledTasks}
                             defaultPlan={userPlans?.find((plan) => plan.isDefault) ?? userPlans?.[0]}
                             // loading={scheduledTasksLoading}
+                            onEventDrop={handleCalendarEventDrop}
+                            onEventResize={handleCalendarEventResize}
+                            onEventClick={handleCalendarEventClick}
                         />
                     </Col>
                     <Col xs={24} lg={8} style={{ height: '100%' }}>
@@ -491,7 +687,7 @@ function Base() {
                         name="title"
                         rules={[{ required: true, message: 'Введите название задачи' }]}
                     >
-                        <Input placeholder="Например: Подготовить отчет" />
+                        <Input size='large' variant="underlined" placeholder="Например: Подготовить отчет" />
                     </Form.Item>
 
                     <Form.Item label="Заметки" name="notes">
@@ -629,6 +825,118 @@ function Base() {
                     >
                         <Input.Password placeholder="Повторите новый пароль" />
                     </Form.Item>
+                </Form>
+            </Modal>
+            
+            {/* Открытие события календаря */}
+            <Modal
+                title={null}
+                open={isScheduledEventModalOpen}
+                closeIcon={null}
+                onOk={handleSaveScheduledEvent}
+                onCancel={() => {
+                    setIsScheduledEventModalOpen(false);
+                    setSelectedScheduledEvent(null);
+                    scheduledEventForm.resetFields();
+                }}
+                okText="Сохранить"
+                cancelText="Отмена"
+                footer={
+                    <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                        <Popconfirm
+                            title="Удалить событие?"
+                            okText="Удалить"
+                            cancelText="Отмена"
+                            onConfirm={handleDeleteScheduledEvent}
+                        >
+                            <Button danger>Удалить</Button>
+                        </Popconfirm>
+                        <Space>
+                            <Button
+                                onClick={() => {
+                                    setIsScheduledEventModalOpen(false);
+                                    setSelectedScheduledEvent(null);
+                                    scheduledEventForm.resetFields();
+                                }}
+                            >
+                                Отмена
+                            </Button>
+                            <Button type="primary" onClick={handleSaveScheduledEvent}>
+                                Сохранить
+                            </Button>
+                        </Space>
+                    </div>
+                }
+            >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, gap: 12 }}>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                        <div
+                            style={{
+                                width: 14,
+                                height: 14,
+                                borderRadius: 3,
+                                background: scheduledTaskInfo?.color || '#232323',
+                                border: '1px solid #d1d5db',
+                                marginTop: 2,
+                            }}
+                        />
+                        <Title level={4} style={{ margin: 0 }}>
+                            {scheduledTaskInfo?.title || 'Событие'}
+                        </Title>
+                    </div>
+                    <Button onClick={handleOpenTaskEditFromEvent}>Редактировать</Button>
+                </div>
+                
+                <Text type="secondary">{scheduledNotes || 'Нет заметок'}</Text>
+
+                <Space orientation="vertical" size={4} style={{ marginTop: 24, width: '100%' }}>
+                    <Flex vertical>
+                        <Space size={6} wrap>
+                            <Text>{scheduledPlan?.name}</Text>
+                            {scheduledPlan?.isDefault ? <Tag color="blue">По умолчанию</Tag> : null}
+                        </Space>
+                        <span style={{ color: '#6b7280', fontSize: 12 }}>{getPlanSlotsInfo(scheduledPlan)}</span>
+                    </Flex>
+                    
+                    <Text type="secondary">Приоритет: {scheduledPriority}</Text>
+                </Space>
+
+                <Divider/>
+
+                <Form form={scheduledEventForm} layout="vertical">
+                    <Row gutter={10}>
+                        <Col span={12}>
+                            <Form.Item label="Закреплена" name="isPinned" valuePropName="checked">
+                                <Switch />
+                            </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                            <Form.Item label="Разрешить разделение" name="isSplittable" valuePropName="checked">
+                                <Switch />
+                            </Form.Item>
+                        </Col>
+                    </Row>
+
+                    <Row gutter={10}>
+                        <Col span={12}>
+                            <Form.Item
+                                label="Начало"
+                                name="startTime"
+                                rules={[{ required: true, message: 'Укажите время начала' }]}
+                            >
+                                <DatePicker showTime format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
+                            </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                            <Form.Item
+                                label="Окончание"
+                                name="endTime"
+                                rules={[{ required: true, message: 'Укажите время окончания' }]}
+                            >
+                                <DatePicker showTime format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
+                            </Form.Item>
+                        </Col>
+                    </Row>
                 </Form>
             </Modal>
             

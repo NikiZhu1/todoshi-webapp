@@ -2,9 +2,17 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import listPlugin from '@fullcalendar/list';
-import { Empty, Spin, Card } from 'antd';
+import interactionPlugin from '@fullcalendar/interaction';
+import { Spin, Card } from 'antd';
 
-function ScheduleCalendar({ tasks = [], defaultPlan, loading = false }) {
+function ScheduleCalendar({
+    tasks = [],
+    defaultPlan,
+    loading = false,
+    onEventDrop,
+    onEventResize,
+    onEventClick,
+}) {
     const events = (tasks ?? [])
         .map((task) => ({
             id: String(task?.id),
@@ -13,6 +21,12 @@ function ScheduleCalendar({ tasks = [], defaultPlan, loading = false }) {
             end: task?.endTime,
             backgroundColor: task?.task?.color ?? '#232323',
             borderColor: task?.task?.color ?? '#232323',
+            classNames: task?.task?.isPinned ? ['pinned-scheduled-event'] : [],
+            extendedProps: {
+                scheduledTask: task,
+                task: task?.task,
+                isPinned: Boolean(task?.task?.isPinned),
+            },
         }))
         .filter((event) => Boolean(event.start));
     
@@ -68,11 +82,14 @@ function ScheduleCalendar({ tasks = [], defaultPlan, loading = false }) {
                 </div>
             ) : (
                 <FullCalendar
-                    plugins={[dayGridPlugin, timeGridPlugin, listPlugin ]}
+                    plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin  ]}
                     locale='ru'
                     timeZone='local'
                     firstDay='1'
                     nowIndicator={true}
+                    editable
+                    eventStartEditable
+                    eventDurationEditable
                     initialView="timeGridWeek"
                     height='100%'
                     events={events}
@@ -89,6 +106,23 @@ function ScheduleCalendar({ tasks = [], defaultPlan, loading = false }) {
                         list:     'Список'
                     }}
                     businessHours={getBusinessHours(defaultPlan)}
+                    eventDrop={onEventDrop}
+                    eventResize={onEventResize}
+                    eventClick={onEventClick}
+                    eventDidMount={(info) => {
+                        if (info.event.extendedProps?.isPinned) {
+                            const el = info.el;
+
+                            // акцентная рамка
+                            el.style.borderLeft = '4px solid #232323';
+
+                            // лёгкая тень
+                            el.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.15)';
+
+                            // чуть плотнее
+                            el.style.fontWeight = '700';
+                        }
+                    }}
                 />
             )}
         </Card>
