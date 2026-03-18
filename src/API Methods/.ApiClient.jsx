@@ -4,6 +4,7 @@ import Cookies from 'js-cookie';
 // const API_BASE_URL = process.env.VITE_APP_API_BASE_URL ?? 'http://localhost:8080/api';
 // const API_BASE_URL = `${window.location.protocol}//${window.location.hostname}/api`
 const API_BASE_URL = 'http://localhost:5166/api';
+// const API_BASE_URL = 'https://localhost:7022/api';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,

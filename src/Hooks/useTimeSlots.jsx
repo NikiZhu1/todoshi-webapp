@@ -22,13 +22,10 @@ export const useTimeSlots = () => {
     };
 
     /** Создать слот */
-    const createSlot = (timePlanId, startTime, endTime) =>
+    const createSlot = (timePlanId, slotData) =>
         execute(async () => {
-            const slotData = {
-                startTime: startTime,
-                endTime: endTime
-            }
             const newSlot = await api.AddSlot(timePlanId, slotData);
+            setTimeSlots((prev) => [...(prev ?? []), newSlot]);
             return newSlot;
         });
 

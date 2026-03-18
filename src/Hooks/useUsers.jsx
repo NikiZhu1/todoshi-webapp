@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import Cookies from 'js-cookie';
+import { useNavigate } from 'react-router-dom';
 import * as api from '../API Methods/userMethods.jsx'; 
 
 export const useUsers = () => {
+    const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
@@ -15,8 +17,12 @@ export const useUsers = () => {
             const token = await api.AuthenticateUser(values, false);
 
             // Сохраняем токен в cookies
+            Cookies.remove('token', {
+                expires: 1,
+                sameSite: 'Strict',
+                path: '/'
+            });
             setTokenToCookie(token);
-            localStorage.clear();
             console.log('Вход: ', values);
         }
         catch (error) {
@@ -52,19 +58,19 @@ export const useUsers = () => {
     const setTokenToCookie = (token) => {
         Cookies.set('token', token, {
             expires: 1,
-            sameSite: 'Strict'
+            sameSite: 'Strict',
+            path: '/'
         });
     };
 
     // Функция выхода
     const logoutUser = () => {
         localStorage.clear();
-        // Cookies.remove('token', {
-        //     sameSite: 'Strict'
-        // });
-        Cookies.remove('guestSessionId');
-        Cookies.remove('refreshToken');
-        Cookies.remove('guest_session_id');
+        Cookies.remove('token', {
+            sameSite: 'Strict'
+        });
+
+        navigate('/login')
     };
 
     /**  Получение информации о пользователе */

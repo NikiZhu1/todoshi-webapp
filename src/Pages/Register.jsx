@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 
 // Методы
 import { useUsers } from '../Hooks/useUsers.jsx';
-import { useTimePlans } from '../Hooks/useTimePlans.jsx';
 
 // Компоненты
 import AuthForm from '../Components/AuthForm.jsx';
@@ -11,7 +10,6 @@ import AuthForm from '../Components/AuthForm.jsx';
 function Register() {
     const navigate = useNavigate();
     const { loading, registerUser } = useUsers();
-    const { createPlan } = useTimePlans();
 
     // Регистрация
     const onFinish = async (values) => {
@@ -23,7 +21,6 @@ function Register() {
             }
 
             await registerUser(values);
-            await createPlan('Любое время', true);
             
             message.success(`Добро пожаловать, ${values.username}!`);
             

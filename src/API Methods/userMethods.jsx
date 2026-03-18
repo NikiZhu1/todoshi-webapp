@@ -11,8 +11,8 @@ export const AuthenticateUser = async (values, isRegistration) => {
         const password = values.password;
 
         const response = await apiClient.post(url, {
-            username: username,
-            password: password
+            "username": username,
+            "password": password
         });
 
         // Получаем JWT токен из ответа на авторизацию

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Button, Card, Slider, Typography } from 'antd';
+import { Button, Card, Checkbox, message, Slider, Typography } from 'antd';
+import { useNavigate } from 'react-router-dom';
 
 import { useTimePlans } from '../Hooks/useTimePlans';
-import { useTimeSlots } from '../Hooks/useTimeSlots'
+import { useTimeSlots } from '../Hooks/useTimeSlots';
 
 const { Title, Text } = Typography;
 
@@ -13,32 +14,68 @@ const formatMinutesToTime = (totalMinutes) => {
 };
 
 function DayBoundsSetup() {
+    const navigate = useNavigate();
     const [timeRange, setTimeRange] = useState([9 * 60, 18 * 60]);
+    const [selectedDays, setSelectedDays] = useState([1, 2, 3, 4, 5]);
 
-    const {userPlans} = useTimePlans();
-    const {loading, createSlot} = useTimeSlots();
+    const { loading: plansLoading, createPlan } = useTimePlans();
+    const { loading: slotsLoading, createSlot } = useTimeSlots();
 
+    const isLoading = plansLoading || slotsLoading;
+    const weekDayOptions = [
+        { label: 'Пн', value: 1 },
+        { label: 'Вт', value: 2 },
+        { label: 'Ср', value: 3 },
+        { label: 'Чт', value: 4 },
+        { label: 'Пт', value: 5 },
+        { label: 'Сб', value: 6 },
+        { label: 'Вс', value: 0 },
+    ];
 
     useEffect(() => {
-        // checkPlan();
     }, []);
 
-    // const checkPlan = async () => {
-    //     const plan = await getTodo(1);
-    //     console.log(plan);
-    // }
-
     const onContinue = async () => {
-        const startTime = formatMinutesToTime(timeRange[0]);
-        const endTime = formatMinutesToTime(timeRange[1]);
+        if (selectedDays.length === 0) {
+            message.error('Выберите хотя бы один день недели');
+            return;
+        }
 
-        console.log({
+        const plan = await createPlan('Любое время', true);
+        const timePlanId = plan.id
+
+        if (!timePlanId) {
+            message.error('Не найден план пользователя для создания слотов');
+            return;
+        }
+
+        const startTime = `${formatMinutesToTime(timeRange[0])}:00`;
+        const endTime = `${formatMinutesToTime(timeRange[1])}:00`;
+
+        const slotPayloads = selectedDays.map((dayOfWeek) => ({
+            dayOfWeek,
             startTime,
             endTime,
-        });
-        
-        const userplan = userPlans
-        await createSlot()
+        }));
+
+        //Создание слотов
+        try {
+            await Promise.all(
+                slotPayloads.map((slotData) => createSlot(timePlanId, slotData))
+            );
+
+            console.log({
+                timePlanId,
+                selectedDays,
+                startTime,
+                endTime,
+            });
+            message.success('Слоты успешно созданы');
+            navigate('/');
+        } catch (error) {
+            console.error('Ошибка при создании слотов:', error);
+            message.error('Не удалось создать слоты');
+        }
     };
 
     const pageStyle = {
@@ -108,18 +145,27 @@ function DayBoundsSetup() {
 
     const currentRangeStyle = {
         marginTop: 8,
-        marginBottom: 22,
+        marginBottom: 16,
         textAlign: 'center',
         fontWeight: 600,
+    };
+
+    const daysTitleStyle = {
+        display: 'block',
+        marginBottom: 10,
+        fontWeight: 600,
+    };
+
+    const daysWrapStyle = {
+        marginBottom: 24,
     };
 
     return (
         <div style={pageStyle}>
             <div style={shellStyle}>
                 <section style={heroStyle}>
-                    <span style={badgeStyle}>Настройка плана</span>
-                    <p></p>
-                    <h1 style={titleStyle}>Перед начало работы настройте свой план</h1>
+                    <span style={badgeStyle}>{`Настройка плана`}</span>
+                    <h1 style={titleStyle}>Перед началом работы настройте свой план</h1>
                     <p style={textStyle}>
                         Укажите удобный интервал для работы, не волнуйтесь, после можно изменить в настройках.
                     </p>
@@ -147,11 +193,21 @@ function DayBoundsSetup() {
                         {formatMinutesToTime(timeRange[0])} - {formatMinutesToTime(timeRange[1])}
                     </div>
 
+                    <Text style={daysTitleStyle}>В какие дни планировать задачи?</Text>
+                    <div style={daysWrapStyle}>
+                        <Checkbox.Group
+                            options={weekDayOptions}
+                            value={selectedDays}
+                            onChange={setSelectedDays}
+                        />
+                    </div>
+
                     <Button
                         type="primary"
                         size="large"
                         block
                         onClick={onContinue}
+                        loading={isLoading}
                         style={{ backgroundColor: '#232323', borderColor: '#232323' }}
                     >
                         Продолжить

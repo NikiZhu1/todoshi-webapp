@@ -46,7 +46,7 @@ export const AddPlan = async (planData) => {
 
     const payload = {
         name: planData.name,
-        isDefault: planData.isDefault || false
+        isDefault: planData.isDefault ?? false
     };
 
     try {

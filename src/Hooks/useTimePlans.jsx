@@ -40,8 +40,8 @@ export const useTimePlans = () => {
     const createPlan = (name, isDefault) =>
         execute(async () => {
             const planData = {
-                name: name,
-                isDefault: isDefault
+                "name": name,
+                "isDefault": isDefault
             } 
             const newPlan = await api.AddPlan(planData);
             setUserPlans((prev) => [...(prev ?? []), newPlan]);

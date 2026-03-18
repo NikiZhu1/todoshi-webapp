@@ -1,5 +1,6 @@
 import { Card, message } from 'antd';
 import { useNavigate } from 'react-router-dom';
+import { useTimePlans } from '../Hooks/useTimePlans.jsx';
 
 // Методы
 import { useUsers } from '../Hooks/useUsers.jsx';
@@ -10,12 +11,14 @@ import AuthForm from '../Components/AuthForm.jsx';
 function Login() {
     const navigate = useNavigate();
     const { loading, loginUser} = useUsers();
+    const { createPlan } = useTimePlans();
 
     // Авторизация
     const onFinish = async (values) => {
         try {
             console.log(values)
             await loginUser(values, false);
+            await createPlan('Любое время', true);
             
             let username = values?.username || 'Пользователь';
             message.success(`Снова здравствуйте, ${username}!`);

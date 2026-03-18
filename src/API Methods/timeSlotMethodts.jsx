@@ -15,9 +15,9 @@ export const AddSlot = async (timePlanId, slotData) => {
         throw new Error('День недели обязателен');
 
     const payload = {
-        dayOfWeek: slotData.dayOfWeek,
-        startTime: slotData.startTime,
-        endTime: slotData.endTime
+        "dayOfWeek": slotData.dayOfWeek,
+        "startTime": slotData.startTime,
+        "endTime": slotData.endTime
     };
 
     try {
