@@ -67,7 +67,7 @@ export const useTodos = () => {
     /** План */ 
     const planTodo = async () => 
         execute(async () => {
-            const response = await api.Plan();
+            const response = await api.Plan('Asia/Yekaterinburg');
             return response;
     });
 

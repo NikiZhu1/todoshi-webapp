@@ -120,7 +120,10 @@ export const DeleteTodo = async (id) => {
 
 export const Plan = async (timezone) => {
     try {
-        const response = await apiClient.post(`/todo/plan`, null);
+        const url = `/todo/plan?timeZoneId=${encodeURIComponent(timezone)}`
+
+        const response = await apiClient.post(url, null);
+        console.log(url)
         const plannedTodos = response.data;
 
         console.log('Получен спланированный список задач:', plannedTodos);

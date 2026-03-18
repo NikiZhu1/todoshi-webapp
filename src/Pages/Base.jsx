@@ -10,12 +10,15 @@ import {
     Form,
     Input,
     InputNumber,
+    Popconfirm,
     Modal,
     Row,
     Select,
     Space,
     Switch,
+    Tag,
     message,
+    Flex,
 } from 'antd';
 
 import TasksPanel from '../Components/TasksPanel';
@@ -30,12 +33,16 @@ const { TextArea } = Input;
 function Base() {
     const navigate = useNavigate();
     const [isCreateTodoModalOpen, setIsCreateTodoModalOpen] = useState(false);
+    const [isEditTodoModalOpen, setIsEditTodoModalOpen] = useState(false);
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
     const [currentUserId, setCurrentUserId] = useState(null);
+    const [selectedTodo, setSelectedTodo] = useState(null);
 
     const [createTodoForm] = Form.useForm();
+    const [editTodoForm] = Form.useForm();
     const [settingsForm] = Form.useForm();
     const selectedColor = Form.useWatch('color', createTodoForm);
+    const selectedEditColor = Form.useWatch('color', editTodoForm);
 
     const colorOptions = ['#232323', '#1677ff', '#13c2c2', '#52c41a', '#faad14', '#f5222d'];
 
@@ -44,6 +51,8 @@ function Base() {
         userTodos,
         getUserTodos,
         createTodo,
+        updateTodo,
+        deleteTodo,
         planTodos,
     } = useTodos();
 
@@ -68,6 +77,95 @@ function Base() {
     } = useTimePlans();
 
     const pageLoading = todosLoading || scheduledTasksLoading || usersLoading || plansLoading;
+    const dayLabels = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+
+    //Информация о плане
+    const getPlanSlotsInfo = (plan) => {
+    const slots = plan?.slots ?? [];
+    if (slots.length === 0) return 'Слотов нет';
+
+    const dayMap = {
+        1: 'Пн',
+        2: 'Вт',
+        3: 'Ср',
+        4: 'Чт',
+        5: 'Пт',
+        6: 'Сб',
+        0: 'Вс'
+    };
+
+    // нормализуем дни (вс = 7 для сортировки)
+    const normalizeDay = (d) => (d === 0 ? 7 : d);
+
+    const sorted = [...slots].sort(
+        (a, b) => normalizeDay(a.dayOfWeek) - normalizeDay(b.dayOfWeek)
+    );
+
+    // группируем по времени
+    const groups = {};
+
+    sorted.forEach((slot) => {
+        const start = slot.startTime?.slice(0, 5) ?? '--:--';
+        const end = slot.endTime?.slice(0, 5) ?? '--:--';
+        const key = `${start}-${end}`;
+
+        if (!groups[key]) {
+            groups[key] = [];
+        }
+
+        groups[key].push(normalizeDay(slot.dayOfWeek));
+    });
+
+    // превращаем дни в диапазоны
+    const formatDays = (days) => {
+        const sortedDays = [...days].sort((a, b) => a - b);
+        const ranges = [];
+
+        let start = sortedDays[0];
+        let prev = start;
+
+        for (let i = 1; i < sortedDays.length; i++) {
+            const curr = sortedDays[i];
+
+            if (curr === prev + 1) {
+                prev = curr;
+            } else {
+                ranges.push([start, prev]);
+                start = curr;
+                prev = curr;
+            }
+        }
+
+        ranges.push([start, prev]);
+
+        return ranges
+            .map(([s, e]) => {
+                if (s === e) return dayMap[s % 7];
+                return `${dayMap[s % 7]}-${dayMap[e % 7]}`;
+            })
+            .join(', ');
+    };
+
+    // собираем итог
+    const result = Object.entries(groups).map(([time, days]) => {
+        return `${formatDays(days)} ${time}`;
+    });
+
+    return result.join(', ');
+    };
+
+    const planOptions = (userPlans ?? []).map((plan) => ({
+        value: plan.id,
+        label: (
+        <Flex vertical>
+            <Space size={6} wrap>
+                <span>{plan.name}</span>
+                {plan.isDefault ? <Tag color="blue">По умолчанию</Tag> : null}
+            </Space>
+            <span style={{ color: '#6b7280', fontSize: 12 }}>{getPlanSlotsInfo(plan)}</span>
+        </Flex>
+        ),
+    }));
 
     useEffect(() => {
         const bootstrap = async () => {
@@ -124,6 +222,33 @@ function Base() {
         ]);
     };
 
+    const normalizeDate = (value) => {
+        if (!value) {
+            return null;
+        }
+
+        if (dayjs.isDayjs(value)) {
+            return value.toISOString();
+        }
+
+        return value;
+    };
+
+    const buildTodoPayload = (source, overrides = {}) => ({
+        title: source?.title?.trim() ?? '',
+        notes: source?.notes?.trim() ?? '',
+        estimatedDurationMinutes: source?.estimatedDurationMinutes,
+        earliestStart: normalizeDate(source?.earliestStart),
+        deadline: normalizeDate(source?.deadline),
+        isSplittable: Boolean(source?.isSplittable),
+        isPinned: Boolean(source?.isPinned),
+        status: source?.status ?? 0,
+        priority: source?.priority ?? 1,
+        timePlanId: source?.timePlanId,
+        color: source?.color || '#232323',
+        ...overrides,
+    });
+
     const handlePlanTodos = async () => {
         try {
             await planTodos();
@@ -164,6 +289,90 @@ function Base() {
                 return;
             }
             message.error('Не удалось создать задачу');
+        }
+    };
+
+    const handleCompleteTodo = async (todo) => {
+        try {
+            const payload = buildTodoPayload(todo, { status: 2 });
+            await updateTodo(todo.id, payload);
+            await refreshMainData();
+            message.success('Задача завершена');
+        } catch (error) {
+            console.error('Ошибка при завершении задачи:', error);
+            message.error('Не удалось завершить задачу');
+        }
+    };
+
+    const handleRestoreTodo = async (todo) => {
+        try {
+            const payload = buildTodoPayload(todo, { status: 0 });
+            await updateTodo(todo.id, payload);
+            await refreshMainData();
+            message.success('Задача возвращена в текущие');
+        } catch (error) {
+            console.error('Ошибка при возврате задачи:', error);
+            message.error('Не удалось вернуть задачу');
+        }
+    };
+
+    const handleOpenTodoDetails = (todo) => {
+        setSelectedTodo(todo);
+        editTodoForm.setFieldsValue({
+            title: todo?.title ?? '',
+            notes: todo?.notes ?? '',
+            estimatedDurationMinutes: todo?.estimatedDurationMinutes ?? 30,
+            earliestStart: todo?.earliestStart ? dayjs(todo.earliestStart) : null,
+            deadline: todo?.deadline ? dayjs(todo.deadline) : null,
+            isSplittable: Boolean(todo?.isSplittable),
+            isPinned: Boolean(todo?.isPinned),
+            status: todo?.status ?? 0,
+            priority: todo?.priority ?? 1,
+            timePlanId: todo?.timePlanId ?? todo?.timePlan?.id,
+            color: todo?.color || '#232323',
+        });
+        setIsEditTodoModalOpen(true);
+    };
+
+    const handleSaveTodoChanges = async () => {
+        if (!selectedTodo?.id) {
+            return;
+        }
+
+        try {
+            const values = await editTodoForm.validateFields();
+            const payload = buildTodoPayload(values);
+            await updateTodo(selectedTodo.id, payload);
+
+            setIsEditTodoModalOpen(false);
+            setSelectedTodo(null);
+            editTodoForm.resetFields();
+            await refreshMainData();
+            message.success('Задача обновлена');
+        } catch (error) {
+            console.error('Ошибка при обновлении задачи:', error);
+            if (error?.errorFields) {
+                return;
+            }
+            message.error('Не удалось обновить задачу');
+        }
+    };
+
+    const handleDeleteTodo = async () => {
+        if (!selectedTodo?.id) {
+            return;
+        }
+
+        try {
+            await deleteTodo(selectedTodo.id);
+            setIsEditTodoModalOpen(false);
+            setSelectedTodo(null);
+            editTodoForm.resetFields();
+            await refreshMainData();
+            message.success('Задача удалена');
+        } catch (error) {
+            console.error('Ошибка при удалении задачи:', error);
+            message.error('Не удалось удалить задачу');
         }
     };
 
@@ -225,7 +434,8 @@ function Base() {
                     <Col xs={24} lg={16} style={{ height: '100%' }}>
                         <ScheduleCalendar
                             tasks={userScheduledTasks}
-                            loading={scheduledTasksLoading}
+                            defaultPlan={userPlans?.find((plan) => plan.isDefault) ?? userPlans?.[0]}
+                            // loading={scheduledTasksLoading}
                         />
                     </Col>
                     <Col xs={24} lg={8} style={{ height: '100%' }}>
@@ -239,13 +449,16 @@ function Base() {
                         >
                             <TasksPanel
                                 todos={userTodos ?? []}
-                            loading={pageLoading}
-                            onPlanTodos={handlePlanTodos}
-                            onOpenCreateTodo={() => setIsCreateTodoModalOpen(true)}
-                            onOpenTimePlans={() => navigate('/time-plans')}
-                            onOpenSettings={() => setIsSettingsModalOpen(true)}
-                            onLogout={logoutUser}
-                        />
+                                loading={pageLoading}
+                                onPlanTodos={handlePlanTodos}
+                                onOpenCreateTodo={() => setIsCreateTodoModalOpen(true)}
+                                onCompleteTodo={handleCompleteTodo}
+                                onRestoreTodo={handleRestoreTodo}
+                                onOpenTodoDetails={handleOpenTodoDetails}
+                                onOpenTimePlans={() => navigate('/time-plans')}
+                                onOpenSettings={() => setIsSettingsModalOpen(true)}
+                                onLogout={logoutUser}
+                            />
                         
                         </Card>
                     </Col>
@@ -315,10 +528,7 @@ function Base() {
                     >
                         <Select
                             placeholder="Выберите план"
-                            options={(userPlans ?? []).map((plan) => ({
-                                label: `${plan.name}${plan.isDefault ? ' (по умолчанию)' : ''}`,
-                                value: plan.id,
-                            }))}
+                            options={planOptions}
                         />
                     </Form.Item>
 
@@ -355,6 +565,7 @@ function Base() {
                                                 padding: 0,
                                                 backgroundColor: color,
                                                 border: selectedColor === color ? '2px solid #111' : '1px solid #d9d9d9',
+                                                borderRadius: selectedColor === color && '4px',
                                             }}
                                             aria-label={`Выбрать цвет ${color}`}
                                         />
@@ -378,7 +589,8 @@ function Base() {
                     </Row>
                 </Form>
             </Modal>
-
+            
+            {/* Настройки профиля */}
             <Modal
                 title="Настройки профиля"
                 open={isSettingsModalOpen}
@@ -417,6 +629,144 @@ function Base() {
                     >
                         <Input.Password placeholder="Повторите новый пароль" />
                     </Form.Item>
+                </Form>
+            </Modal>
+            
+            {/* Редактирование задачи модалка */}
+            <Modal
+                title="Редактирование задачи"
+                open={isEditTodoModalOpen}
+                onCancel={() => {
+                    setIsEditTodoModalOpen(false);
+                    setSelectedTodo(null);
+                }}
+                footer={
+                    <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                        <Popconfirm
+                            title="Удалить задачу?"
+                            description="Действие нельзя отменить"
+                            okText="Удалить"
+                            cancelText="Отмена"
+                            onConfirm={handleDeleteTodo}
+                        >
+                            <Button danger>Удалить</Button>
+                        </Popconfirm>
+                        <Space>
+                            <Button
+                                onClick={() => {
+                                    setIsEditTodoModalOpen(false);
+                                    setSelectedTodo(null);
+                                }}
+                            >
+                                Отмена
+                            </Button>
+                            <Button type="primary" onClick={handleSaveTodoChanges}>
+                                Сохранить
+                            </Button>
+                        </Space>
+                    </div>
+                }
+            >
+                <Form form={editTodoForm} layout="vertical">
+                    <Form.Item
+                        label="Название"
+                        name="title"
+                        rules={[{ required: true, message: 'Введите название задачи' }]}
+                    >
+                        <Input />
+                    </Form.Item>
+
+                    <Form.Item label="Заметки" name="notes">
+                        <TextArea rows={3} />
+                    </Form.Item>
+
+                    <Row gutter={10}>
+                        <Col span={12}>
+                            <Form.Item
+                                label="Длительность (минуты)"
+                                name="estimatedDurationMinutes"
+                                rules={[{ required: true, message: 'Укажите длительность задачи' }]}
+                            >
+                                <InputNumber min={5} step={5} style={{ width: '100%' }} />
+                            </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                            <Form.Item label="Приоритет" name="priority">
+                                <Select
+                                    options={[
+                                        { label: 'Высокий', value: 0 },
+                                        { label: 'Средний', value: 1 },
+                                        { label: 'Низкий', value: 2 },
+                                    ]}
+                                />
+                            </Form.Item>
+                        </Col>
+                    </Row>
+
+                    <Form.Item
+                        label="Временной план"
+                        name="timePlanId"
+                        rules={[{ required: true, message: 'Выберите временной план' }]}
+                    >
+                        <Select
+                            options={planOptions}
+                        />
+                    </Form.Item>
+
+                    <Row gutter={10}>
+                        <Col span={12}>
+                            <Form.Item
+                                label="Старт"
+                                name="earliestStart"
+                                rules={[{ required: true, message: 'Укажите время начала' }]}
+                            >
+                                <DatePicker showTime format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
+                            </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                            <Form.Item label="Дедлайн" name="deadline">
+                                <DatePicker showTime format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
+                            </Form.Item>
+                        </Col>
+                    </Row>
+
+                    <Row gutter={10}>
+                        <Col span={24}>
+                            <Form.Item label="Цвет" name="color">
+                                <Space size={10} wrap>
+                                    {colorOptions.map((color) => (
+                                        <Button
+                                            key={color}
+                                            shape="circle"
+                                            type="default"
+                                            onClick={() => editTodoForm.setFieldValue('color', color)}
+                                            style={{
+                                                width: 30,
+                                                height: 30,
+                                                padding: 0,
+                                                backgroundColor: color,
+                                                border: selectedEditColor === color ? '2px solid #111' : '1px solid #d9d9d9',
+                                                borderRadius: selectedEditColor === color && '4px',
+                                            }}
+                                        />
+                                    ))}
+                                </Space>
+                            </Form.Item>
+                        </Col>
+                    </Row>
+
+                    <Row gutter={10}>
+                        <Col span={12}>
+                            <Form.Item label="Можно делить" name="isSplittable" valuePropName="checked">
+                                <Switch />
+                            </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                            <Form.Item label="Закрепить" name="isPinned" valuePropName="checked">
+                                <Switch />
+                            </Form.Item>
+                        </Col>
+                    </Row>
                 </Form>
             </Modal>
         </div>

@@ -1,17 +1,18 @@
-import { Button, Dropdown, Empty, List, Space, Tag, Typography } from 'antd';
-import { PlusOutlined, ScheduleOutlined, UserOutlined } from '@ant-design/icons';
+import { useMemo, useState } from 'react';
+import { Button, Collapse, Dropdown, Empty, Skeleton, Space, Tag, Typography } from 'antd';
+import { CheckOutlined, PlusOutlined, RollbackOutlined, ScheduleOutlined, UserOutlined } from '@ant-design/icons';
 
 const { Title, Text } = Typography;
 
 const priorityToLabel = {
     0: { text: 'Высокий', color: 'red' },
-    1: { text: 'Средний', color: 'gold' },
+    1: { text: 'Обычный', color: 'gold' },
     2: { text: 'Низкий', color: 'green' },
 };
 
 const statusToLabel = {
-    0: { text: 'Незапланирована', color: 'default' },
-    1: { text: 'Запланирована', color: 'blue' },
+    0: { text: 'Незапланирована', color: 'red' },
+    1: { text: 'В плане', color: 'blue' },
     2: { text: 'Выполнена', color: 'success' },
 };
 
@@ -20,15 +21,43 @@ function TasksPanel({
     loading = false,
     onPlanTodos,
     onOpenCreateTodo,
+    onCompleteTodo,
+    onRestoreTodo,
+    onOpenTodoDetails,
     onOpenTimePlans,
     onOpenSettings,
     onLogout,
 }) {
+    const [hoveredTodoId, setHoveredTodoId] = useState(null);
+
+    const parseCreatedTime = (todo) => (
+        new Date(todo?.created).getTime()
+    );
+
+    const sortedTodos = useMemo(
+        () => [...(todos ?? [])].sort((a, b) => parseCreatedTime(b) - parseCreatedTime(a)),
+        [todos]
+    );
+
+    const activeTodos = sortedTodos.filter((todo) => todo?.status !== 2);
+    const completedTodos = sortedTodos.filter((todo) => todo?.status === 2);
+
     const menuItems = [
         { key: 'timePlans', label: 'Временные планы' },
         { key: 'settings', label: 'Настройки' },
         { key: 'logout', label: 'Выход', danger: true },
     ];
+
+    const formatDuration = (minutes) => {
+        if (!minutes && minutes !== 0) {
+            return null;
+        }
+
+        const total = Number(minutes);
+        const hh = Math.floor(total / 60);
+        const mm = total % 60;
+        return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+    };
 
     const handleMenuClick = ({ key }) => {
         if (key === 'timePlans') {
@@ -46,6 +75,70 @@ function TasksPanel({
         }
     };
 
+    const renderTodoBlock = (todo, isCompleted = false) => {
+        const priority = priorityToLabel[todo?.priority] ?? { text: 'Не задан', color: 'default' };
+        const status = statusToLabel[todo?.status] ?? { text: 'Не задан', color: 'default' };
+        const duration = formatDuration(todo?.estimatedDurationMinutes);
+        const isHovered = hoveredTodoId === todo?.id;
+
+        return (
+            <div
+                key={todo?.id}
+                onClick={() => onOpenTodoDetails?.(todo)}
+                onMouseEnter={() => setHoveredTodoId(todo?.id)}
+                onMouseLeave={() => setHoveredTodoId(null)}
+                style={{
+                    cursor: 'pointer',
+                    border: isHovered ? '1px solid #d0d5dd' : '1px solid #ebedf0',
+                    background: isHovered ? '#fafafa' : '#fff',
+                    borderRadius: 10,
+                    padding: 12,
+                    marginBottom: 8,
+                    transition: 'all .2s ease',
+                    boxShadow: isHovered ? '0 4px 12px rgba(15, 23, 42, 0.08)' : 'none',
+                }}
+            >
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                    <Space orientation="vertical" size={4} style={{ width: '100%' }}>
+                        <Space>
+                            <Text strong delete={isCompleted}>{todo?.title ?? 'Без названия'}</Text>
+                            <Tag>{duration}</Tag>
+                        </Space>
+                        {todo?.notes ? <Text type="secondary">{todo.notes}</Text> : null}
+                        <Space wrap>
+                            <Tag color={isCompleted ? 'success' : status.color}>
+                                {isCompleted ? 'Выполнена' : status.text}
+                            </Tag>
+                            <Tag color={priority.color}>Приоритет: {priority.text}</Tag>
+                        </Space>
+                    </Space>
+
+                    {!isCompleted ? (
+                        <Button
+                            variant="outlined"
+                            icon={<CheckOutlined />}
+                            title="Завершить задачу"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onCompleteTodo?.(todo);
+                            }}
+                        />
+                    ) : (
+                        <Button
+                            variant="outlined"
+                            icon={<RollbackOutlined />}
+                            title="Вернуть в текущие"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onRestoreTodo?.(todo);
+                            }}
+                        />
+                    )}
+                </div>
+            </div>
+        );
+    };
+
     return (
         <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -61,46 +154,44 @@ function TasksPanel({
                 onClick={onPlanTodos}
                 loading={loading}
                 block
-                size='large'
+                size="large"
             >
-                Запланировать
+                Распределить
             </Button>
 
             <Button
                 icon={<PlusOutlined />}
                 onClick={onOpenCreateTodo}
                 block
-                size='large'
+                size="large"
                 style={{ marginTop: 8, marginBottom: 12 }}
             >
-                Создать задачу
+                Добавить задачу
             </Button>
 
             <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-                <List
-                    loading={loading}
-                    dataSource={todos}
-                    locale={{ emptyText: <Empty description="Задач пока нет" /> }}
-                    renderItem={(todo) => {
-                        const priority = priorityToLabel[todo?.priority] ?? { text: 'Не задан', color: 'default' };
-                        const status = statusToLabel[todo?.status] ?? { text: 'Не задан', color: 'default' };
+                <Text strong style={{ display: 'block', marginBottom: 8 }}>Текущие задачи</Text>
+                {loading ? (
+                    <Skeleton />
+                ) : activeTodos.length === 0 ? (
+                    <Empty description="Задач пока нет" />
+                ) : (
+                    <div>{activeTodos.map((todo) => renderTodoBlock(todo, false))}</div>
+                )}
 
-                        return (
-                            <List.Item>
-                                <Space direction="vertical" size={4} style={{ width: '100%' }}>
-                                    <Text strong>{todo?.title ?? 'Без названия'}</Text>
-                                    {todo?.notes ? <Text type="secondary">{todo.notes}</Text> : null}
-                                    <Space wrap>
-                                        <Tag color={priority.color}>Приоритет: {priority.text}</Tag>
-                                        <Tag color={status.color}>Статус: {status.text}</Tag>
-                                        {todo?.estimatedDurationMinutes ? (
-                                            <Tag>{todo.estimatedDurationMinutes} мин</Tag>
-                                        ) : null}
-                                    </Space>
-                                </Space>
-                            </List.Item>
-                        );
-                    }}
+                <Collapse
+                    style={{ marginTop: 12 }}
+                    items={[
+                        {
+                            key: 'completed',
+                            label: `Завершённые задачи (${completedTodos.length})`,
+                            children: completedTodos.length === 0 ? (
+                                <Empty description="Завершённых задач нет" />
+                            ) : (
+                                <div>{completedTodos.map((todo) => renderTodoBlock(todo, true))}</div>
+                            ),
+                        },
+                    ]}
                 />
             </div>
         </div>
