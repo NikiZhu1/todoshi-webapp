@@ -1,4 +1,4 @@
-import { Button, Card, Dropdown, Empty, List, Space, Tag, Typography } from 'antd';
+import { Button, Dropdown, Empty, List, Space, Tag, Typography } from 'antd';
 import { PlusOutlined, ScheduleOutlined, UserOutlined } from '@ant-design/icons';
 
 const { Title, Text } = Typography;
@@ -20,16 +20,22 @@ function TasksPanel({
     loading = false,
     onPlanTodos,
     onOpenCreateTodo,
+    onOpenTimePlans,
     onOpenSettings,
     onLogout,
 }) {
     const menuItems = [
         { key: 'timePlans', label: 'Временные планы' },
         { key: 'settings', label: 'Настройки' },
-        { key: 'logout', label: 'Выход', danger: 'true' },
+        { key: 'logout', label: 'Выход', danger: true },
     ];
 
     const handleMenuClick = ({ key }) => {
+        if (key === 'timePlans') {
+            onOpenTimePlans?.();
+            return;
+        }
+
         if (key === 'settings') {
             onOpenSettings?.();
             return;
@@ -41,35 +47,36 @@ function TasksPanel({
     };
 
     return (
-        <div>
-            <Space direction="vertical" size={12} style={{ width: '100%' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Title level={4} style={{ margin: 0 }}>Ваши задачи</Title>
-                    <Dropdown menu={{ items: menuItems, onClick: handleMenuClick }} trigger={['click']}>
-                        <Button icon={<UserOutlined />}>Профиль</Button>
-                    </Dropdown>
-                </div>
+        <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <Title level={4} style={{ margin: 0 }}>Ваши задачи</Title>
+                <Dropdown menu={{ items: menuItems, onClick: handleMenuClick }} trigger={['click']}>
+                    <Button icon={<UserOutlined />}>Профиль</Button>
+                </Dropdown>
+            </div>
 
-                <Button
-                    type="primary"
-                    icon={<ScheduleOutlined />}
-                    onClick={onPlanTodos}
-                    loading={loading}
-                    block
-                    size='large'
-                >
-                    Запланировать
-                </Button>
+            <Button
+                type="primary"
+                icon={<ScheduleOutlined />}
+                onClick={onPlanTodos}
+                loading={loading}
+                block
+                size='large'
+            >
+                Запланировать
+            </Button>
 
-                <Button
-                    icon={<PlusOutlined />}
-                    onClick={onOpenCreateTodo}
-                    block
-                    size='large'
-                >
-                    Создать задачу
-                </Button>
+            <Button
+                icon={<PlusOutlined />}
+                onClick={onOpenCreateTodo}
+                block
+                size='large'
+                style={{ marginTop: 8, marginBottom: 12 }}
+            >
+                Создать задачу
+            </Button>
 
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
                 <List
                     loading={loading}
                     dataSource={todos}
@@ -95,7 +102,7 @@ function TasksPanel({
                         );
                     }}
                 />
-            </Space>
+            </div>
         </div>
     );
 }

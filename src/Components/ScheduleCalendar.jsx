@@ -8,11 +8,11 @@ function ScheduleCalendar({ tasks = [], loading = false }) {
     const events = (tasks ?? [])
         .map((task) => ({
             id: String(task?.id),
-            title: task?.task.title ?? `Задача #${task?.task.taskId }`,
+            title: task?.task?.title ?? `Задача #${task?.task?.taskId}`,
             start: task?.startTime,
             end: task?.endTime,
-            backgroundColor: task?.color ?? '#232323',
-            borderColor: task?.color ?? '#232323',
+            backgroundColor: task?.task?.color ?? '#232323',
+            borderColor: task?.task?.color ?? '#232323',
         }))
         .filter((event) => Boolean(event.start));
 
@@ -21,16 +21,17 @@ function ScheduleCalendar({ tasks = [], loading = false }) {
             style={{
                 borderRadius: 14,
                 border: '1px solid #e5e7eb',
-                minHeight: '78vh',
+                height: '100%',
             }}
+            styles={{ body: { padding: 12, height: '100%' } }}
         >
 
             {loading ? (
-                <div style={{ height: 560, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <Spin />
                 </div>
             ) : events.length === 0 ? (
-                <div style={{ height: 560, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <Empty description="Нет запланированных задач" />
                 </div>
             ) : (
@@ -40,7 +41,7 @@ function ScheduleCalendar({ tasks = [], loading = false }) {
                     firstDay='1'
                     nowIndicator={true}
                     initialView="dayGridMonth"
-                    height='560px'
+                    height='100%'
                     events={events}
                     headerToolbar={{
                         left: 'prev,next today',

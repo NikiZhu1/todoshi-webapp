@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react';
 import Cookies from 'js-cookie';
+import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import {
     Button,
     Card,
     Col,
     DatePicker,
-    Dropdown,
-    Flex,
     Form,
     Input,
     InputNumber,
@@ -16,27 +15,29 @@ import {
     Select,
     Space,
     Switch,
-    Typography,
     message,
 } from 'antd';
-import { PlusOutlined, ScheduleOutlined, UserOutlined } from '@ant-design/icons';
 
 import TasksPanel from '../Components/TasksPanel';
 import ScheduleCalendar from '../Components/ScheduleCalendar';
 import { useTodos } from '../Hooks/useTodos';
 import { useUsers } from '../Hooks/useUsers';
 import { useScheduledTasks } from '../Hooks/useScheduledTasks';
+import { useTimePlans } from '../Hooks/useTimePlans';
 
-const { Title, Text } = Typography;
 const { TextArea } = Input;
 
 function Base() {
+    const navigate = useNavigate();
     const [isCreateTodoModalOpen, setIsCreateTodoModalOpen] = useState(false);
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
     const [currentUserId, setCurrentUserId] = useState(null);
 
     const [createTodoForm] = Form.useForm();
     const [settingsForm] = Form.useForm();
+    const selectedColor = Form.useWatch('color', createTodoForm);
+
+    const colorOptions = ['#232323', '#1677ff', '#13c2c2', '#52c41a', '#faad14', '#f5222d'];
 
     const {
         loading: todosLoading,
@@ -60,7 +61,13 @@ function Base() {
         GetUserIdFromJWT,
     } = useUsers();
 
-    const pageLoading = todosLoading || scheduledTasksLoading || usersLoading;
+    const {
+        loading: plansLoading,
+        userPlans,
+        getUserPlans,
+    } = useTimePlans();
+
+    const pageLoading = todosLoading || scheduledTasksLoading || usersLoading || plansLoading;
 
     useEffect(() => {
         const bootstrap = async () => {
@@ -78,6 +85,7 @@ function Base() {
                 await Promise.all([
                     getUserTodos(userId),
                     getUserTasks(userId),
+                    getUserPlans(userId),
                 ]);
             } catch (error) {
                 console.error('Ошибка загрузки данных главной страницы:', error);
@@ -88,6 +96,22 @@ function Base() {
         bootstrap();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    useEffect(() => {
+        if (!isCreateTodoModalOpen) {
+            return;
+        }
+
+        const currentPlanId = createTodoForm.getFieldValue('timePlanId');
+        if (currentPlanId) {
+            return;
+        }
+
+        const defaultPlan = (userPlans ?? []).find((plan) => plan.isDefault) ?? userPlans?.[0];
+        if (defaultPlan?.id) {
+            createTodoForm.setFieldValue('timePlanId', defaultPlan.id);
+        }
+    }, [isCreateTodoModalOpen, userPlans, createTodoForm]);
 
     const refreshMainData = async () => {
         if (!currentUserId) {
@@ -125,6 +149,7 @@ function Base() {
                 isPinned: Boolean(values.isPinned),
                 status: values.status,
                 priority: values.priority,
+                timePlanId: values.timePlanId,
                 color: values.color || '#232323',
             };
 
@@ -192,40 +217,35 @@ function Base() {
             style={{
                 minHeight: '100vh',
                 background: 'linear-gradient(135deg, #171717 0%, #101010 58%, #2e2e2e 100%)',
-                // paddingTop: '16px',
+                padding: '10px',
             }}
         >
-            <div>
-                {/* <Space direction="vertical" size={6} style={{ marginBottom: 14 }}>
-                    <Title level={3} style={{ color: '#ffffff', margin: 0 }}>
-                        TodoShi
-                    </Title>
-                </Space> */}
-
-                <Row gutter={[16, 16]} style={{margin: '8px'}}>
-                    <Col xs={24} lg={16}>
+            <div style={{ height: 'calc(100vh - 20px)' }}>
+                <Row gutter={[12, 12]} style={{ height: '100%' }}>
+                    <Col xs={24} lg={16} style={{ height: '100%' }}>
                         <ScheduleCalendar
                             tasks={userScheduledTasks}
                             loading={scheduledTasksLoading}
                         />
                     </Col>
-                    <Col xs={24} lg={8}>
+                    <Col xs={24} lg={8} style={{ height: '100%' }}>
                         <Card
                             style={{
                                 borderRadius: 14,
                                 border: '1px solid #e5e7eb',
-                                minHeight: '78vh',
+                                height: '100%',
                             }}
-                            // styles={{ body: { padding: 20 } }}
+                            styles={{ body: { padding: 16, height: '100%' } }}
                         >
                             <TasksPanel
                                 todos={userTodos ?? []}
-                                loading={pageLoading}
-                                onPlanTodos={handlePlanTodos}
-                                onOpenCreateTodo={() => setIsCreateTodoModalOpen(true)}
-                                onOpenSettings={() => setIsSettingsModalOpen(true)}
-                                onLogout={logoutUser}
-                            />
+                            loading={pageLoading}
+                            onPlanTodos={handlePlanTodos}
+                            onOpenCreateTodo={() => setIsCreateTodoModalOpen(true)}
+                            onOpenTimePlans={() => navigate('/time-plans')}
+                            onOpenSettings={() => setIsSettingsModalOpen(true)}
+                            onLogout={logoutUser}
+                        />
                         
                         </Card>
                     </Col>
@@ -249,6 +269,7 @@ function Base() {
                         isPinned: false,
                         status: 0,
                         priority: 1,
+                        earliestStart: dayjs(),
                         color: '#232323',
                     }}
                 >
@@ -287,6 +308,20 @@ function Base() {
                         </Col>
                     </Row>
 
+                    <Form.Item
+                        label="Временной план"
+                        name="timePlanId"
+                        rules={[{ required: true, message: 'Выберите временной план' }]}
+                    >
+                        <Select
+                            placeholder="Выберите план"
+                            options={(userPlans ?? []).map((plan) => ({
+                                label: `${plan.name}${plan.isDefault ? ' (по умолчанию)' : ''}`,
+                                value: plan.id,
+                            }))}
+                        />
+                    </Form.Item>
+
                     <Row gutter={10}>
                         <Col span={12}>
                             <Form.Item
@@ -294,7 +329,7 @@ function Base() {
                                 name="earliestStart"
                                 rules={[{ required: true, message: 'Укажите время начала' }]}
                             >
-                                <DatePicker format="DD.MM.YYYY" style={{ width: '100%' }} initialValues={dayjs()} />
+                                <DatePicker format="DD.MM.YYYY" style={{ width: '100%' }} />
                             </Form.Item>
                         </Col>
                         <Col span={12}>
@@ -305,17 +340,37 @@ function Base() {
                     </Row>
 
                     <Row gutter={10}>
-                        <Col span={8}>
+                        <Col span={24}>
                             <Form.Item label="Цвет" name="color">
-                                <Input type="color" style={{ height: 34 }} />
+                                <Space size={10} wrap>
+                                    {colorOptions.map((color) => (
+                                        <Button
+                                            key={color}
+                                            shape="circle"
+                                            type="default"
+                                            onClick={() => createTodoForm.setFieldValue('color', color)}
+                                            style={{
+                                                width: 30,
+                                                height: 30,
+                                                padding: 0,
+                                                backgroundColor: color,
+                                                border: selectedColor === color ? '2px solid #111' : '1px solid #d9d9d9',
+                                            }}
+                                            aria-label={`Выбрать цвет ${color}`}
+                                        />
+                                    ))}
+                                </Space>
                             </Form.Item>
                         </Col>
-                        <Col span={8}>
+                    </Row>
+
+                    <Row gutter={10}>
+                        <Col span={12}>
                             <Form.Item label="Можно делить" name="isSplittable" valuePropName="checked">
                                 <Switch />
                             </Form.Item>
                         </Col>
-                        <Col span={8}>
+                        <Col span={12}>
                             <Form.Item label="Закрепить" name="isPinned" valuePropName="checked">
                                 <Switch />
                             </Form.Item>

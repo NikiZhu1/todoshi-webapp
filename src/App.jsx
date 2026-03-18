@@ -7,6 +7,7 @@ import Base from './Pages/Base';
 import Login from './Pages/Login';
 import Register from './Pages/Register';
 import DayBoundsSetup from './Pages/DayBoundsSetup';
+import TimePlans from './Pages/TimePlans';
 
 function App() {
   return (
@@ -34,6 +35,7 @@ function App() {
                     <Route path="/login" element={<Login />} />
                     <Route path="/register" element={<Register />} />
                     <Route path="/day-setup" element={<DayBoundsSetup />} />
+                    <Route path="/time-plans" element={<TimePlans />} />
                     <Route path="/" element={<Base />} /> 
                 </Routes>
             </Router>
