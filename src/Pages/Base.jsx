@@ -1,41 +1,24 @@
 import { useEffect, useState } from 'react';
 import Cookies from 'js-cookie';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
-import {
-    Button,
-    Card,
-    Col,
-    DatePicker,
-    Form,
-    Input,
-    InputNumber,
-    Popconfirm,
-    Modal,
-    Row,
-    Select,
-    Space,
-    Switch,
-    Tag,
-    message,
-    Flex,
-    Typography,
-    Splitter,
-    Divider,
-} from 'antd';
-
+import { Button, Card, Col, DatePicker, Form, Input, InputNumber, Popconfirm, 
+    Modal, Row, Select, Space, Switch, Tag, message, Flex, Typography, Divider } from 'antd';
 import TasksPanel from '../Components/TasksPanel';
 import ScheduleCalendar from '../Components/ScheduleCalendar';
+
 import { useTodos } from '../Hooks/useTodos';
 import { useUsers } from '../Hooks/useUsers';
 import { useScheduledTasks } from '../Hooks/useScheduledTasks';
 import { useTimePlans } from '../Hooks/useTimePlans';
+import { useUserCalendars } from '../Hooks/useUserCalendars';
 
 const { TextArea } = Input;
 const { Title, Text } = Typography;
 
 function Base() {
     const navigate = useNavigate();
+    const location = useLocation();
     const [isCreateTodoModalOpen, setIsCreateTodoModalOpen] = useState(false);
     const [isEditTodoModalOpen, setIsEditTodoModalOpen] = useState(false);
     const [isScheduledEventModalOpen, setIsScheduledEventModalOpen] = useState(false);
@@ -85,6 +68,8 @@ function Base() {
         getUserPlans,
     } = useTimePlans();
 
+    const { userCalendars, getUserCalendars } = useUserCalendars();
+
     const pageLoading = todosLoading || scheduledTasksLoading || usersLoading || plansLoading;
     const dayLabels = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
     const priorityLabels = {
@@ -92,7 +77,6 @@ function Base() {
         1: 'Средний',
         2: 'Низкий',
     };
-
     //Информация о плане
     const getPlanSlotsInfo = (plan) => {
     const slots = plan?.slots ?? [];
@@ -198,6 +182,7 @@ function Base() {
                     getUserTodos(userId),
                     getUserTasks(userId),
                     getUserPlans(userId),
+                    getUserCalendars(userId)
                 ]);
             } catch (error) {
                 console.error('Ошибка загрузки данных главной страницы:', error);
@@ -224,6 +209,16 @@ function Base() {
             createTodoForm.setFieldValue('timePlanId', defaultPlan.id);
         }
     }, [isCreateTodoModalOpen, userPlans, createTodoForm]);
+
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        if (params.get('openSettings') !== '1') {
+            return;
+        }
+
+        setIsSettingsModalOpen(true);
+        navigate('/', { replace: true });
+    }, [location.search, navigate]);
 
     const refreshMainData = async () => {
         if (!currentUserId) {
@@ -615,20 +610,14 @@ function Base() {
     const scheduledNotes = scheduledTaskInfo?.notes?.trim();
 
     return (
-        <div
-            style={{
-                minHeight: '100vh',
-                background: 'linear-gradient(135deg, #171717 0%, #101010 58%, #2e2e2e 100%)',
-                padding: '10px',
-            }}
-        >
-            <div style={{ height: 'calc(100vh - 20px)' }}>
-                <Row gutter={[12, 12]} style={{ height: '100%' }}>
+        <div style={{ height: 'calc(100vh - 90px)', overflow: 'hidden' }}>
+                <Row gutter={[12, 12]} style={{ height: '100%', overflow: 'hidden' }}>
                     <Col xs={24} lg={16} style={{ height: '100%' }}>
                         <ScheduleCalendar
                             tasks={userScheduledTasks}
+                            userCalendars={userCalendars}
                             defaultPlan={userPlans?.find((plan) => plan.isDefault) ?? userPlans?.[0]}
-                            // loading={scheduledTasksLoading}
+                            loading={scheduledTasksLoading}
                             onEventDrop={handleCalendarEventDrop}
                             onEventResize={handleCalendarEventResize}
                             onEventClick={handleCalendarEventClick}
@@ -647,19 +636,15 @@ function Base() {
                                 todos={userTodos ?? []}
                                 loading={pageLoading}
                                 onPlanTodos={handlePlanTodos}
-                                onOpenCreateTodo={() => setIsCreateTodoModalOpen(true)}
-                                onCompleteTodo={handleCompleteTodo}
-                                onRestoreTodo={handleRestoreTodo}
-                                onOpenTodoDetails={handleOpenTodoDetails}
-                                onOpenTimePlans={() => navigate('/time-plans')}
-                                onOpenSettings={() => setIsSettingsModalOpen(true)}
-                                onLogout={logoutUser}
+                            onOpenCreateTodo={() => setIsCreateTodoModalOpen(true)}
+                            onCompleteTodo={handleCompleteTodo}
+                            onRestoreTodo={handleRestoreTodo}
+                            onOpenTodoDetails={handleOpenTodoDetails}
                             />
                         
                         </Card>
                     </Col>
                 </Row>
-            </div>
 
             {/* Модальное окно создания */}
             <Modal

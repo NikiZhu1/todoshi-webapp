@@ -60,6 +60,17 @@ export const GetUserIdFromJWT = (token) => {
     }
 };
 
+export const getGoogleCalendar = async (link) => {
+    try {
+        const response = await apiClient.get(`/user/google-calendar?link=${link}`);
+        return response;
+    }
+    catch (error) {
+        console.error(`Ошибка при получении календаря`, error);
+        throw error;
+    }
+};
+
 export const getUserInfo = async (userId) => {
     try {
         const response = await apiClient.get(`/user/${userId}`);

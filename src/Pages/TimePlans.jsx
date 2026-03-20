@@ -6,6 +6,7 @@ import {
     Card,
     Col,
     Empty,
+    Flex,
     Input,
     List,
     Popconfirm,
@@ -260,30 +261,27 @@ function TimePlans() {
     return (
         <div
             style={{
-                minHeight: '100vh',
-                background: 'linear-gradient(135deg, #171717 0%, #101010 58%, #2e2e2e 100%)',
-                padding: 10,
+                height: '100%',
             }}
         >
-            <Row gutter={[12, 12]} style={{ height: 'calc(100vh - 20px)' }}>
+            <Row gutter={[12, 12]} style={{ height: '100%' }}>
                 <Col xs={24} lg={8} style={{ height: '100%' }}>
                     <Card style={{ height: '100%', borderRadius: 14 }} styles={{ body: { height: '100%', display: 'flex', flexDirection: 'column' } }}>
-                        <Space direction="vertical" size={10} style={{ width: '100%' }}>
-                            <Space>
-                                <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/')}>
-                                    Назад
-                                </Button>
-                                <Title level={4} style={{ margin: 0 }}>Планы</Title>
-                            </Space>
+                        <Space orientation="vertical" size={10} style={{ width: '100%' }}>
+                            <Flex vertical>
+                                <Title level={4} style={{ margin: 0 }}>Ваши планы</Title>
+                                <Text type='secondary' style={{ margin: 0 }}>Создайте новый временный план или настройте существующие</Text>
+                            </Flex>
 
                             <Space.Compact style={{ width: '100%' }}>
                                 <Input
+                                    size='large'
                                     placeholder="Название нового плана"
                                     value={newPlanName}
                                     onChange={(e) => setNewPlanName(e.target.value)}
                                     onPressEnter={handleCreatePlan}
                                 />
-                                <Button type="primary" icon={<PlusOutlined />} onClick={handleCreatePlan} />
+                                <Button size='large' type="primary" icon={<PlusOutlined />} onClick={handleCreatePlan} />
                             </Space.Compact>
                         </Space>
 

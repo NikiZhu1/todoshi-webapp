@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Button, Collapse, Dropdown, Empty, Skeleton, Space, Tag, Typography } from 'antd';
-import { CheckOutlined, PlusOutlined, RollbackOutlined, ScheduleOutlined, UserOutlined } from '@ant-design/icons';
+import { Button, Collapse, Empty, Skeleton, Space, Tag, Typography } from 'antd';
+import { CheckOutlined, PlusOutlined, RollbackOutlined, ScheduleOutlined } from '@ant-design/icons';
 
 const { Title, Text } = Typography;
 
@@ -24,9 +24,6 @@ function TasksPanel({
     onCompleteTodo,
     onRestoreTodo,
     onOpenTodoDetails,
-    onOpenTimePlans,
-    onOpenSettings,
-    onLogout,
 }) {
     const [hoveredTodoId, setHoveredTodoId] = useState(null);
 
@@ -42,12 +39,6 @@ function TasksPanel({
     const activeTodos = sortedTodos.filter((todo) => todo?.status !== 2);
     const completedTodos = sortedTodos.filter((todo) => todo?.status === 2);
 
-    const menuItems = [
-        { key: 'timePlans', label: 'Временные планы' },
-        { key: 'settings', label: 'Настройки' },
-        { key: 'logout', label: 'Выход', danger: true },
-    ];
-
     const formatDuration = (minutes) => {
         if (!minutes && minutes !== 0) {
             return null;
@@ -57,22 +48,6 @@ function TasksPanel({
         const hh = Math.floor(total / 60);
         const mm = total % 60;
         return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
-    };
-
-    const handleMenuClick = ({ key }) => {
-        if (key === 'timePlans') {
-            onOpenTimePlans?.();
-            return;
-        }
-
-        if (key === 'settings') {
-            onOpenSettings?.();
-            return;
-        }
-
-        if (key === 'logout') {
-            onLogout?.();
-        }
     };
 
     const renderTodoBlock = (todo, isCompleted = false) => {
@@ -141,11 +116,8 @@ function TasksPanel({
 
     return (
         <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
                 <Title level={4} style={{ margin: 0 }}>Ваши задачи</Title>
-                <Dropdown menu={{ items: menuItems, onClick: handleMenuClick }} trigger={['click']}>
-                    <Button icon={<UserOutlined />}>Профиль</Button>
-                </Dropdown>
             </div>
 
             <Button

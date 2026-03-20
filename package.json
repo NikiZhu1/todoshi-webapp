@@ -5,6 +5,8 @@
   "dependencies": {
     "@fullcalendar/core": "^6.1.20",
     "@fullcalendar/daygrid": "^6.1.20",
+    "@fullcalendar/google-calendar": "^6.1.20",
+    "@fullcalendar/icalendar": "^6.1.20",
     "@fullcalendar/interaction": "^6.1.20",
     "@fullcalendar/list": "^6.1.20",
     "@fullcalendar/react": "^6.1.20",
@@ -16,6 +18,7 @@
     "antd": "^6.3.3",
     "axios": "^1.13.6",
     "dayjs": "^1.11.20",
+    "ical.js": "^1.5.0",
     "js-cookie": "^3.0.5",
     "jwt-decode": "^4.0.0",
     "react": "^19.2.4",

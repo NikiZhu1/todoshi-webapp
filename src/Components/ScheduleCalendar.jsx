@@ -3,16 +3,21 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import listPlugin from '@fullcalendar/list';
 import interactionPlugin from '@fullcalendar/interaction';
+import iCalendarPlugin from '@fullcalendar/icalendar'
+import googleCalendarPlugin from '@fullcalendar/google-calendar';
 import { Spin, Card } from 'antd';
 
 function ScheduleCalendar({
     tasks = [],
+    userCalendars,
     defaultPlan,
     loading = false,
     onEventDrop,
     onEventResize,
     onEventClick,
 }) {
+
+    //Подготавливаем задачи пользователя для вставки в календарь
     const events = (tasks ?? [])
         .map((task) => ({
             id: String(task?.id),
@@ -30,6 +35,7 @@ function ScheduleCalendar({
         }))
         .filter((event) => Boolean(event.start));
     
+    //Отображение на календаре временного плана по умолчанию
     const getBusinessHours = (plan) => {
         const slots = plan?.slots ?? [];
         if (slots.length === 0) return [];
@@ -66,6 +72,28 @@ function ScheduleCalendar({
         }));
     };
 
+    //Подготавливаем календари пользователя для вставки в календарь
+    const buildCalendarSources = (userCalendars) => {
+        if (!userCalendars?.length) return [];
+
+        return userCalendars.map((cal) => {
+            if (cal.format === 'google') {
+                return {
+                    googleCalendarId: cal.link
+                };
+            }
+
+            if (cal.format === 'ics') {
+                return {
+                    url: cal.link,
+                    format: 'ics'
+                };
+            }
+
+            return null;
+        }).filter(Boolean);
+    };
+
     return (
         <Card
             style={{
@@ -82,7 +110,7 @@ function ScheduleCalendar({
                 </div>
             ) : (
                 <FullCalendar
-                    plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin  ]}
+                    plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin, iCalendarPlugin, googleCalendarPlugin  ]}
                     locale='ru'
                     timeZone='local'
                     firstDay='1'
@@ -92,7 +120,15 @@ function ScheduleCalendar({
                     eventDurationEditable
                     initialView="timeGridWeek"
                     height='100%'
-                    events={events}
+                    // Получаем гугл апи ключ из env файла. 
+                    // При создании апи ключа указаны домены, которые могут использовать этот ключ, 
+                    // поэтому при дальнейшем развёртывании можно указать домен
+                    // и даже если ключ найдут, то доступа к нему не будет.
+                    googleCalendarApiKey={process.env.REACT_APP_GOOGLE_API_KEY}
+                    eventSources={[
+                        events, 
+                        ...buildCalendarSources(userCalendars)
+                    ]}
                     headerToolbar={{
                         left: 'prev,next today',
                         center: 'title',
