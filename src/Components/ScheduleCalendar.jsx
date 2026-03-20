@@ -8,6 +8,7 @@ import googleCalendarPlugin from '@fullcalendar/google-calendar';
 import { Spin, Card } from 'antd';
 
 function ScheduleCalendar({
+    calendarRef,
     tasks = [],
     userCalendars,
     defaultPlan,
@@ -79,14 +80,34 @@ function ScheduleCalendar({
         return userCalendars.map((cal) => {
             if (cal.format === 'google') {
                 return {
-                    googleCalendarId: cal.link
+                    id: cal.userCalendarId,
+                    googleCalendarId: cal.link,
+                    eventDataTransform: (eventData) => ({
+                        ...eventData,
+                        extendedProps: {
+                            ...eventData.extendedProps,
+                            sourceType: 'google',
+                            calendarId: cal.userCalendarId,
+                            calendarTitle: cal.title
+                        }
+                    })
                 };
             }
 
             if (cal.format === 'ics') {
                 return {
+                    id: cal.userCalendarId,
                     url: cal.link,
-                    format: 'ics'
+                    format: 'ics',
+                    eventDataTransform: (eventData) => ({
+                        ...eventData,
+                        extendedProps: {
+                            ...eventData.extendedProps,
+                            sourceType: 'ics',
+                            calendarId: cal.userCalendarId,
+                            calendarTitle: cal.title
+                        }
+                    })
                 };
             }
 
@@ -110,6 +131,7 @@ function ScheduleCalendar({
                 </div>
             ) : (
                 <FullCalendar
+                    ref={calendarRef}
                     plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin, iCalendarPlugin, googleCalendarPlugin  ]}
                     locale='ru'
                     timeZone='local'

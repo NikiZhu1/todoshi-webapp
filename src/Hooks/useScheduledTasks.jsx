@@ -21,14 +21,14 @@ export const useScheduledTasks = () => {
         }
     };
 
-    /** Получить Todo */
+    /** Получить запланированную задачу */
     const getTask = (id) => 
         execute(async () => {
             const taskData = await api.GetScheduledTask(id);
             return taskData;
     });
 
-    /** Получить задачи пользователя */ 
+    /** Получить запланированные задачи пользователя */ 
     const getUserTasks = (userId) =>
         execute(async () => {
             const taskData = await api.GetUserScheduledTasks(userId);
@@ -36,7 +36,7 @@ export const useScheduledTasks = () => {
             return taskData;
     });
 
-    /** Создать */ 
+    /** Добавить запланированную задачу */ 
     const createTask = (taskId, startTime, endTime) => 
         execute(async () => {
             const newTask = await api.AddScheduledTask(taskId, startTime, endTime);
@@ -44,7 +44,7 @@ export const useScheduledTasks = () => {
             return newTask;
     });
 
-    /** Изменить */ 
+    /** Изменить запланированную задачу */ 
     const updateTask = (id, taskId, startTime, endTime) =>
         execute(async () => {
             const response = await api.UpdateScheduledTask(id, taskId, startTime, endTime);
@@ -56,7 +56,7 @@ export const useScheduledTasks = () => {
             return response;
     });
 
-    /** Удалить */ 
+    /** Удалить запланированную задачу (не todo) */ 
     const deleteTask = (id) => 
         execute(async () => {
             const response = await api.DeleteScheduledTask(id);

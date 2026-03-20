@@ -18,7 +18,6 @@ function Login() {
         try {
             console.log(values)
             await loginUser(values, false);
-            await createPlan('Любое время', true);
             
             let username = values?.username || 'Пользователь';
             message.success(`Снова здравствуйте, ${username}!`);

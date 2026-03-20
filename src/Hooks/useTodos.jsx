@@ -65,9 +65,9 @@ export const useTodos = () => {
     });
 
     /** План */ 
-    const planTodo = async () => 
+    const planTodo = async (calendarEvents) => 
         execute(async () => {
-            const response = await api.Plan('Asia/Yekaterinburg');
+            const response = await api.Plan('Asia/Yekaterinburg', calendarEvents);
             return response;
     });
 

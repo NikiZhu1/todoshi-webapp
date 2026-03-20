@@ -24,7 +24,7 @@ function AppShell() {
       }}
     >
       <MainTopBar />
-      <div style={{ flex: 1, minHeight: 0 }}>
+      <div>
         <Outlet />
       </div>
     </div>

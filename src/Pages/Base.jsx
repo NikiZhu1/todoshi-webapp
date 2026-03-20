@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Cookies from 'js-cookie';
 import { useLocation, useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -26,6 +26,7 @@ function Base() {
     const [currentUserId, setCurrentUserId] = useState(null);
     const [selectedTodo, setSelectedTodo] = useState(null);
     const [selectedScheduledEvent, setSelectedScheduledEvent] = useState(null);
+    const calendarRef = useRef(null);
 
     const [createTodoForm] = Form.useForm();
     const [editTodoForm] = Form.useForm();
@@ -36,120 +37,103 @@ function Base() {
 
     const colorOptions = ['#232323', '#1677ff', '#13c2c2', '#52c41a', '#faad14', '#f5222d'];
 
+    // hoooks
     const {
         loading: todosLoading,
-        userTodos,
-        getUserTodos,
-        createTodo,
-        updateTodo,
-        deleteTodo,
-        planTodos,
+        userTodos, getUserTodos, createTodo, updateTodo, deleteTodo, planTodos,
     } = useTodos();
 
     const {
         loading: scheduledTasksLoading,
-        userScheduledTasks,
-        getUserTasks,
-        updateTask,
-        deleteTask,
+        userScheduledTasks, getUserTasks, updateTask, deleteTask,
     } = useScheduledTasks();
 
     const {
-        loading: usersLoading,
-        logoutUser,
-        changeUsername,
-        changePassword,
-        GetUserIdFromJWT,
+        loading: usersLoading, logoutUser, changeUsername, changePassword, GetUserIdFromJWT,
     } = useUsers();
 
     const {
         loading: plansLoading,
-        userPlans,
-        getUserPlans,
+        userPlans, getUserPlans,
     } = useTimePlans();
 
     const { userCalendars, getUserCalendars } = useUserCalendars();
 
     const pageLoading = todosLoading || scheduledTasksLoading || usersLoading || plansLoading;
-    const dayLabels = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
     const priorityLabels = {
         0: 'Высокий',
         1: 'Средний',
         2: 'Низкий',
     };
-    //Информация о плане
+
+    //Формирование информации о слотах плана
     const getPlanSlotsInfo = (plan) => {
-    const slots = plan?.slots ?? [];
-    if (slots.length === 0) return 'Слотов нет';
+        const slots = plan?.slots ?? [];
+        if (slots.length === 0) return 'Слотов нет';
 
-    const dayMap = {
-        1: 'Пн',
-        2: 'Вт',
-        3: 'Ср',
-        4: 'Чт',
-        5: 'Пт',
-        6: 'Сб',
-        0: 'Вс'
-    };
+        const dayMap = {
+            1: 'Пн', 2: 'Вт', 3: 'Ср',  4: 'Чт',
+            5: 'Пт', 6: 'Сб', 0: 'Вс'
+        };
 
-    // нормализуем дни (вс = 7 для сортировки)
-    const normalizeDay = (d) => (d === 0 ? 7 : d);
+        // нормализуем дни (вс = 7 для сортировки)
+        const normalizeDay = (d) => (d === 0 ? 7 : d);
 
-    const sorted = [...slots].sort(
-        (a, b) => normalizeDay(a.dayOfWeek) - normalizeDay(b.dayOfWeek)
-    );
+        const sorted = [...slots].sort(
+            (a, b) => normalizeDay(a.dayOfWeek) - normalizeDay(b.dayOfWeek)
+        );
 
-    // группируем по времени
-    const groups = {};
+        // группируем по времени
+        const groups = {};
 
-    sorted.forEach((slot) => {
-        const start = slot.startTime?.slice(0, 5) ?? '--:--';
-        const end = slot.endTime?.slice(0, 5) ?? '--:--';
-        const key = `${start}-${end}`;
+        sorted.forEach((slot) => {
+            const start = slot.startTime?.slice(0, 5) ?? '--:--';
+            const end = slot.endTime?.slice(0, 5) ?? '--:--';
+            const key = `${start}-${end}`;
 
-        if (!groups[key]) {
-            groups[key] = [];
-        }
-
-        groups[key].push(normalizeDay(slot.dayOfWeek));
-    });
-
-    // превращаем дни в диапазоны
-    const formatDays = (days) => {
-        const sortedDays = [...days].sort((a, b) => a - b);
-        const ranges = [];
-
-        let start = sortedDays[0];
-        let prev = start;
-
-        for (let i = 1; i < sortedDays.length; i++) {
-            const curr = sortedDays[i];
-
-            if (curr === prev + 1) {
-                prev = curr;
-            } else {
-                ranges.push([start, prev]);
-                start = curr;
-                prev = curr;
+            if (!groups[key]) {
+                groups[key] = [];
             }
-        }
 
-        ranges.push([start, prev]);
+            groups[key].push(normalizeDay(slot.dayOfWeek));
+        });
 
-        return ranges
-            .map(([s, e]) => {
-                if (s === e) return dayMap[s % 7];
-                return `${dayMap[s % 7]}-${dayMap[e % 7]}`;
-            })
-            .join(', ');
-    };
+        // превращаем дни в диапазоны
+        const formatDays = (days) => {
+            const sortedDays = [...days].sort((a, b) => a - b);
+            const ranges = [];
 
-    // собираем итог
-    const result = Object.entries(groups).map(([time, days]) => {
-        return `${formatDays(days)} ${time}`;
-    });
+            let start = sortedDays[0];
+            let prev = start;
 
-    return result.join(', ');
+            for (let i = 1; i < sortedDays.length; i++) {
+                const curr = sortedDays[i];
+
+                if (curr === prev + 1) {
+                    prev = curr;
+                } else {
+                    ranges.push([start, prev]);
+                    start = curr;
+                    prev = curr;
+                }
+            }
+
+            ranges.push([start, prev]);
+
+            return ranges
+                .map(([s, e]) => {
+                    if (s === e) return dayMap[s % 7];
+                    return `${dayMap[s % 7]}-${dayMap[e % 7]}`;
+                })
+                .join(', ');
+        };
+
+        // собираем итог
+        const result = Object.entries(groups).map(([time, days]) => {
+            return `${formatDays(days)} ${time}`;
+        });
+
+        return result.join(', ');
     };
 
     const planOptions = (userPlans ?? []).map((plan) => ({
@@ -165,6 +149,7 @@ function Base() {
         ),
     }));
 
+    //проверяем пользователя и загружаем информацию при открытии
     useEffect(() => {
         const bootstrap = async () => {
             const token = Cookies.get('token');
@@ -191,7 +176,6 @@ function Base() {
         };
 
         bootstrap();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
@@ -267,9 +251,29 @@ function Base() {
         return diff > 0 ? diff : null;
     };
 
+    //распределить задачи
     const handlePlanTodos = async () => {
         try {
-            await planTodos();
+            
+            const calendarApi = calendarRef.current?.getApi?.();
+            const calendarEvents = calendarApi?.getEvents?.() ?? [];
+            console.log('FullCalendar events:', calendarEvents);
+
+            const filteredEvents = calendarEvents
+            .filter(event =>
+                !event.allDay &&
+                (event.extendedProps?.sourceType === 'ics' ||
+                event.extendedProps?.sourceType === 'google')
+            )
+            .map(event => ({
+                title: event.title,
+                start: event.start,
+                end: event.end ?? event.start
+            }));
+
+            console.log('Filtered events:', filteredEvents);
+
+            await planTodos(filteredEvents);
             await refreshMainData();
             message.success('Планирование выполнено');
         } catch (error) {
@@ -278,6 +282,7 @@ function Base() {
         }
     };
 
+    //Создать todo
     const handleCreateTodo = async () => {
         try {
             const values = await createTodoForm.validateFields();
@@ -310,6 +315,7 @@ function Base() {
         }
     };
 
+    //переместить задачу в выполненные (поставить статус = 2)
     const handleCompleteTodo = async (todo) => {
         try {
             const payload = buildTodoPayload(todo, { status: 2 });
@@ -322,6 +328,7 @@ function Base() {
         }
     };
 
+    //вернуть задачу из выполненных (поставить статус = 0)
     const handleRestoreTodo = async (todo) => {
         try {
             const payload = buildTodoPayload(todo, { status: 0 });
@@ -352,6 +359,7 @@ function Base() {
         setIsEditTodoModalOpen(true);
     };
 
+    //сохранить изменения todo
     const handleSaveTodoChanges = async () => {
         if (!selectedTodo?.id) {
             return;
@@ -376,6 +384,7 @@ function Base() {
         }
     };
 
+    //при перемещении события
     const handleCalendarEventDrop = async (info) => {
         const scheduled = info.event.extendedProps?.scheduledTask;
         const task = info.event.extendedProps?.task;
@@ -399,6 +408,7 @@ function Base() {
         }
     };
 
+    //при изменении времени события
     const handleCalendarEventResize = async (info) => {
         const scheduled = info.event.extendedProps?.scheduledTask;
         const task = info.event.extendedProps?.task;
@@ -614,10 +624,11 @@ function Base() {
                 <Row gutter={[12, 12]} style={{ height: '100%', overflow: 'hidden' }}>
                     <Col xs={24} lg={16} style={{ height: '100%' }}>
                         <ScheduleCalendar
+                            calendarRef={calendarRef}
                             tasks={userScheduledTasks}
                             userCalendars={userCalendars}
                             defaultPlan={userPlans?.find((plan) => plan.isDefault) ?? userPlans?.[0]}
-                            loading={scheduledTasksLoading}
+                            // loading={scheduledTasksLoading}
                             onEventDrop={handleCalendarEventDrop}
                             onEventResize={handleCalendarEventResize}
                             onEventClick={handleCalendarEventClick}
