@@ -6,6 +6,7 @@ import { useUsers } from '../Hooks/useUsers.jsx';
 
 // Компоненты
 import AuthForm from '../Components/AuthForm.jsx';
+import { getUserByUsername } from '../API Methods/userMethods.jsx';
 
 function Register() {
     const navigate = useNavigate();
@@ -21,6 +22,7 @@ function Register() {
             }
 
             await registerUser(values);
+            await getUserByUsername(values.username);
             
             message.success(`Добро пожаловать, ${values.username}!`);
             

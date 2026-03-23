@@ -29,22 +29,6 @@ export const AuthenticateUser = async (values, isRegistration) => {
     }
 };
 
-export const RefreshUserToken = async (token) => {
-  try {
-        const response = await apiClient.post('/user/refresh', {}, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'withCredentials': true
-        }
-      });
-        return response.data;
-    }
-    catch (error) {
-        console.error(`Ошибка при обновлении токена пользователя`, error);
-        throw error;
-    }
-}
-
 export const GetUserIdFromJWT = (token) => {
     try {
         const decoded = jwtDecode(token);
@@ -57,17 +41,6 @@ export const GetUserIdFromJWT = (token) => {
     } catch (decodeError) {
         console.error('Ошибка при декодировании токена:', decodeError);
         return null;
-    }
-};
-
-export const getGoogleCalendar = async (link) => {
-    try {
-        const response = await apiClient.get(`/user/google-calendar?link=${link}`);
-        return response;
-    }
-    catch (error) {
-        console.error(`Ошибка при получении календаря`, error);
-        throw error;
     }
 };
 

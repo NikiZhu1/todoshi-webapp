@@ -10,8 +10,8 @@ import AuthForm from '../Components/AuthForm.jsx';
 
 function Login() {
     const navigate = useNavigate();
-    const { loading, loginUser} = useUsers();
-    const { createPlan } = useTimePlans();
+    const { loading, loginUser } = useUsers();
+    const { getUserPlans } = useTimePlans();
 
     // Авторизация
     const onFinish = async (values) => {
@@ -21,7 +21,7 @@ function Login() {
             
             let username = values?.username || 'Пользователь';
             message.success(`Снова здравствуйте, ${username}!`);
-            
+
             // Перенаправляем на главную страницу
             navigate('/');
         } catch (error) {

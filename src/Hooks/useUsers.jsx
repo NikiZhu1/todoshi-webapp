@@ -23,6 +23,8 @@ export const useUsers = () => {
                 path: '/'
             });
             setTokenToCookie(token);
+
+            
             console.log('Вход: ', values);
         }
         catch (error) {
