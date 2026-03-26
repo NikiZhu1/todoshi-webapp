@@ -22,7 +22,6 @@ function Register() {
             }
 
             await registerUser(values);
-            await getUserByUsername(values.username);
             
             message.success(`Добро пожаловать, ${values.username}!`);
             

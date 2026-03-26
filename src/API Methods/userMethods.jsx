@@ -57,7 +57,7 @@ export const getUserInfo = async (userId) => {
 
 export const getUserByUsername = async (username) => {
     try {
-        const response = await apiClient.get(`/user/by-username/${username}`);
+        const response = await apiClient.get(`/user/by-username/?username=${username}`);
         return response.data;
     }
     catch (error) {
