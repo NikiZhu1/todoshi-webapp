@@ -122,7 +122,6 @@ function TasksPanel({
 
             <Button
                 type="primary"
-                icon={<ScheduleOutlined />}
                 onClick={onPlanTodos}
                 loading={loading}
                 block

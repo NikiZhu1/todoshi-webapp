@@ -12,7 +12,7 @@ html, body, #root {
   height: 100%;
   margin: 0;
   padding: 0;
-  overflow: hidden;
+  /* overflow: hidden; */
 }
 
 * {
@@ -23,3 +23,48 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+.main-schedule-calendar .fc {
+  color: #232323;
+}
+
+.main-schedule-calendar .fc .fc-toolbar-title,
+.main-schedule-calendar .fc .fc-col-header-cell-cushion,
+.main-schedule-calendar .fc .fc-timegrid-axis-cushion,
+.main-schedule-calendar .fc .fc-list-day-text,
+.main-schedule-calendar .fc .fc-list-day-side-text,
+.main-schedule-calendar .fc .fc-list-event-time,
+.main-schedule-calendar .fc .fc-daygrid-day-number {
+  color: #232323;
+}
+
+/* .main-schedule-calendar .fc .fc-button-primary {
+  background-color: #3c4f65;
+  border-color: #3c4f65;
+  color: #f8fafc;
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.main-schedule-calendar .fc .fc-button-primary:hover {
+  background-color: #33465b;
+  border-color: #33465b;
+  color: #ffffff;
+}
+
+.main-schedule-calendar .fc .fc-button-primary:focus,
+.main-schedule-calendar .fc .fc-button-primary:active,
+.main-schedule-calendar .fc .fc-button-primary.fc-button-active {
+  background-color: #2b3e53;
+  border-color: #2b3e53;
+  color: #ffffff;
+  box-shadow: none;
+}
+
+.main-schedule-calendar .fc .fc-button-group > .fc-button {
+  border-radius: 8px;
+}
+
+.main-schedule-calendar .fc .fc-button-group > .fc-button:not(:first-child) {
+  margin-left: 4px;
+} */

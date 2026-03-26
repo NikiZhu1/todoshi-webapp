@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import Cookies from 'js-cookie';
 import { useLocation, useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { Button, Card, Col, DatePicker, Form, Input, InputNumber, Popconfirm, 
-    Modal, Row, Select, Space, Switch, Tag, message, Flex, Typography, Divider } from 'antd';
+import { Button, Card, Col, DatePicker, Form, Input, Popconfirm, 
+    Modal, Row, Select, Space, Switch, Tag, message, Flex, Typography, Divider, TimePicker } from 'antd';
 import TasksPanel from '../Components/TasksPanel';
 import ScheduleCalendar from '../Components/ScheduleCalendar';
 
@@ -15,6 +15,7 @@ import { useUserCalendars } from '../Hooks/useUserCalendars';
 
 const { TextArea } = Input;
 const { Title, Text } = Typography;
+const MAX_DURATION_MINUTES = 23 * 60 + 55;
 
 function Base() {
     const navigate = useNavigate();
@@ -35,7 +36,7 @@ function Base() {
     const selectedColor = Form.useWatch('color', createTodoForm);
     const selectedEditColor = Form.useWatch('color', editTodoForm);
 
-    const colorOptions = ['#232323', '#1677ff', '#13c2c2', '#52c41a', '#faad14', '#f5222d'];
+    const colorOptions = ['#232323', '#1677ff', '#13c2c2', '#52c41a', '#faad14', '#f5222d', '#722ed1', '#eb2f96'];
 
     // hoooks
     const {
@@ -60,11 +61,11 @@ function Base() {
     const { userCalendars, getUserCalendars } = useUserCalendars();
 
     const pageLoading = todosLoading || scheduledTasksLoading || usersLoading || plansLoading;
-    const priorityLabels = {
-        0: 'Высокий',
-        1: 'Средний',
-        2: 'Низкий',
-    };
+    const priorityLabels = [
+        { label: 'Высокий', value: 0 },
+        { label: 'Обычный', value: 1 },
+        { label: 'Низкий', value: 2 },
+    ];
 
     //Формирование информации о слотах плана
     const getPlanSlotsInfo = (plan) => {
@@ -227,10 +228,44 @@ function Base() {
         return value;
     };
 
+    const durationMinutesToPickerValue = (minutes) => {
+        if (minutes === null || minutes === undefined) {
+            return null;
+        }
+
+        const normalized = Math.max(0, Math.min(Number(minutes), MAX_DURATION_MINUTES));
+        return dayjs('2000-01-01T00:00:00').add(normalized, 'minute');
+    };
+
+    const durationPickerValueToMinutes = (value) => {
+        if (!value || !dayjs.isDayjs(value)) {
+            if (value === null || value === undefined || value === '') {
+                return null;
+            }
+
+            const parsed = Number(value);
+            return Number.isFinite(parsed) ? parsed : null;
+        }
+
+        return value.hour() * 60 + value.minute();
+    };
+
+    const ensureDurationPickerValue = (value) => {
+        if (value === null || value === undefined) {
+            return null;
+        }
+
+        if (dayjs.isDayjs(value)) {
+            return value;
+        }
+
+        return durationMinutesToPickerValue(value);
+    };
+
     const buildTodoPayload = (source, overrides = {}) => ({
         title: source?.title?.trim() ?? '',
         notes: source?.notes?.trim() ?? '',
-        estimatedDurationMinutes: source?.estimatedDurationMinutes,
+        estimatedDurationMinutes: durationPickerValueToMinutes(source?.estimatedDurationMinutes),
         earliestStart: normalizeDate(source?.earliestStart),
         deadline: normalizeDate(source?.deadline),
         isSplittable: Boolean(source?.isSplittable),
@@ -250,6 +285,54 @@ function Base() {
         const diff = dayjs(endIso).diff(dayjs(startIso), 'minute');
         return diff > 0 ? diff : null;
     };
+
+    const validateNotBefore = (startFieldName, messageText, granularity) => ({ getFieldValue }) => ({
+        validator(_, value) {
+            const start = getFieldValue(startFieldName);
+            if (!value || !start) {
+                return Promise.resolve();
+            }
+
+            const isBefore = granularity
+                ? value.isBefore(start, granularity)
+                : value.isBefore(start);
+
+            if (isBefore) {
+                return Promise.reject(new Error(messageText));
+            }
+
+            return Promise.resolve();
+        },
+    });
+
+    const buildRange = (end) => Array.from({ length: end }, (_, index) => index);
+
+    const validateDuration = () => ({
+        validator(_, value) {
+            if (!value) {
+                return Promise.reject(new Error('Укажите длительность задачи'));
+            }
+
+            if (!dayjs.isDayjs(value)) {
+                return Promise.reject(new Error('Некорректный формат длительности'));
+            }
+
+            const minutes = durationPickerValueToMinutes(value);
+            if (minutes < 5) {
+                return Promise.reject(new Error('Минимальная длительность: 5 минут'));
+            }
+
+            if (minutes > MAX_DURATION_MINUTES) {
+                return Promise.reject(new Error('Максимальная длительность: 12 часов'));
+            }
+
+            if (minutes % 5 !== 0) {
+                return Promise.reject(new Error('Шаг длительности: 5 минут'));
+            }
+
+            return Promise.resolve();
+        },
+    });
 
     //распределить задачи
     const handlePlanTodos = async () => {
@@ -290,7 +373,7 @@ function Base() {
             const payload = {
                 title: values.title?.trim(),
                 notes: values.notes?.trim(),
-                estimatedDurationMinutes: values.estimatedDurationMinutes,
+                estimatedDurationMinutes: durationPickerValueToMinutes(values.estimatedDurationMinutes),
                 earliestStart: values.earliestStart?.toISOString(),
                 deadline: values.deadline ? values.deadline.toISOString() : null,
                 isSplittable: Boolean(values.isSplittable),
@@ -346,7 +429,7 @@ function Base() {
         editTodoForm.setFieldsValue({
             title: todo?.title ?? '',
             notes: todo?.notes ?? '',
-            estimatedDurationMinutes: todo?.estimatedDurationMinutes ?? 30,
+            estimatedDurationMinutes: durationMinutesToPickerValue(todo?.estimatedDurationMinutes ?? 30),
             earliestStart: todo?.earliestStart ? dayjs(todo.earliestStart) : null,
             deadline: todo?.deadline ? dayjs(todo.deadline) : null,
             isSplittable: Boolean(todo?.isSplittable),
@@ -616,7 +699,7 @@ function Base() {
     const scheduledTaskInfo = selectedScheduledEvent?.task;
     const scheduledPlanId = scheduledTaskInfo?.timePlanId ?? scheduledTaskInfo?.timePlan?.id;
     const scheduledPlan = (userPlans ?? []).find((plan) => plan.id === scheduledPlanId);
-    const scheduledPriority = priorityLabels[scheduledTaskInfo?.priority] ?? 'Не задан';
+    const scheduledPriority = priorityLabels.find(item => item.value === scheduledTaskInfo?.priority)?.label ?? 'Не задан';
     const scheduledNotes = scheduledTaskInfo?.notes?.trim();
 
     return (
@@ -661,6 +744,7 @@ function Base() {
             <Modal
                 title="Создать задачу"
                 open={isCreateTodoModalOpen}
+                centered
                 onOk={handleCreateTodo}
                 onCancel={() => setIsCreateTodoModalOpen(false)}
                 okText="Создать"
@@ -674,6 +758,7 @@ function Base() {
                         isPinned: false,
                         status: 0,
                         priority: 1,
+                        estimatedDurationMinutes: durationMinutesToPickerValue(30),
                         earliestStart: dayjs(),
                         color: '#232323',
                     }}
@@ -693,21 +778,23 @@ function Base() {
                     <Row gutter={10}>
                         <Col span={12}>
                             <Form.Item
-                                label="Длительность (минуты)"
+                                label="Длительность (чч:мм)"
                                 name="estimatedDurationMinutes"
-                                rules={[{ required: true, message: 'Укажите длительность задачи' }]}
+                                rules={[validateDuration()]}
+                                getValueProps={(value) => ({ value: ensureDurationPickerValue(value) })}
                             >
-                                <InputNumber min={5} step={5} style={{ width: '100%' }} />
+                                <TimePicker
+                                    format="HH:mm"
+                                    minuteStep={5}
+                                    showNow={false}
+                                    style={{ width: '100%' }}
+                                />
                             </Form.Item>
                         </Col>
                         <Col span={12}>
                             <Form.Item label="Приоритет" name="priority">
                                 <Select
-                                    options={[
-                                        { label: 'Высокий', value: 0 },
-                                        { label: 'Средний', value: 1 },
-                                        { label: 'Низкий', value: 2 },
-                                    ]}
+                                    options={priorityLabels}
                                 />
                             </Form.Item>
                         </Col>
@@ -735,14 +822,36 @@ function Base() {
                             </Form.Item>
                         </Col>
                         <Col span={12}>
-                            <Form.Item label="Дедлайн" name="deadline">
-                                <DatePicker showTime format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
+                            <Form.Item
+                                label="Дедлайн"
+                                name="deadline"
+                                dependencies={['earliestStart']}
+                                rules={[
+                                    validateNotBefore(
+                                        'earliestStart',
+                                        'Дедлайн не может быть раньше даты начала',
+                                        'day'
+                                    ),
+                                ]}
+                            >
+                                <DatePicker
+                                    showTime
+                                    format="DD.MM.YYYY HH:mm"
+                                    style={{ width: '100%' }}
+                                    disabledDate={(current) => {
+                                        const start = createTodoForm.getFieldValue('earliestStart');
+                                        if (!start || !current) {
+                                            return false;
+                                        }
+                                        return current.startOf('day').isBefore(start.startOf('day'));
+                                    }}
+                                />
                             </Form.Item>
                         </Col>
                     </Row>
 
                     <Row gutter={10}>
-                        <Col span={24}>
+                        <Col span={12}>
                             <Form.Item label="Цвет" name="color">
                                 <Space size={10} wrap>
                                     {colorOptions.map((color) => (
@@ -765,16 +874,8 @@ function Base() {
                                 </Space>
                             </Form.Item>
                         </Col>
-                    </Row>
-
-                    <Row gutter={10}>
                         <Col span={12}>
                             <Form.Item label="Можно делить" name="isSplittable" valuePropName="checked">
-                                <Switch />
-                            </Form.Item>
-                        </Col>
-                        <Col span={12}>
-                            <Form.Item label="Закрепить" name="isPinned" valuePropName="checked">
                                 <Switch />
                             </Form.Item>
                         </Col>
@@ -887,7 +988,7 @@ function Base() {
 
                 <Space orientation="vertical" size={4} style={{ marginTop: 24, width: '100%' }}>
                     <Flex vertical>
-                        <Space size={6} wrap>
+                        <Space size={6} wrap >
                             <Text>{scheduledPlan?.name}</Text>
                             {scheduledPlan?.isDefault ? <Tag color="blue">По умолчанию</Tag> : null}
                         </Space>
@@ -902,12 +1003,12 @@ function Base() {
                 <Form form={scheduledEventForm} layout="vertical">
                     <Row gutter={10}>
                         <Col span={12}>
-                            <Form.Item label="Закреплена" name="isPinned" valuePropName="checked">
+                            <Form.Item extra="Задачу можно разделить на несколько мелких" label="Можно делить" name="isSplittable" valuePropName="checked">
                                 <Switch />
                             </Form.Item>
                         </Col>
                         <Col span={12}>
-                            <Form.Item label="Разрешить разделение" name="isSplittable" valuePropName="checked">
+                            <Form.Item extra="Время закреплённых задач не изменяется при распределении" label="Закреплена" name="isPinned" valuePropName="checked">
                                 <Switch />
                             </Form.Item>
                         </Col>
@@ -920,16 +1021,51 @@ function Base() {
                                 name="startTime"
                                 rules={[{ required: true, message: 'Укажите время начала' }]}
                             >
-                                <DatePicker showTime format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
+                                <DatePicker
+                                    showTime
+                                    format="DD.MM.YYYY HH:mm"
+                                    style={{ width: '100%' }}
+                                />
                             </Form.Item>
                         </Col>
                         <Col span={12}>
                             <Form.Item
-                                label="Окончание"
+                                label="Конец"
                                 name="endTime"
-                                rules={[{ required: true, message: 'Укажите время окончания' }]}
+                                dependencies={['startTime']}
+                                rules={[
+                                    { required: true, message: 'Укажите время окончания' },
+                                    validateNotBefore('startTime', 'Конец не может быть раньше старта'),
+                                ]}
                             >
-                                <DatePicker showTime format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
+                                <DatePicker showTime format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} 
+                                    disabledDate={(current) => {
+                                        const start = scheduledEventForm.getFieldValue('startTime');
+                                        if (!start || !current) {
+                                            return false;
+                                        }
+                                        return current.startOf('day').isBefore(start.startOf('day'));
+                                    }}
+                                    disabledTime={(current) => {
+                                        const start = scheduledEventForm.getFieldValue('startTime');
+                                        if (!start || !current || !current.isSame(start, 'day')) {
+                                            return {};
+                                        }
+
+                                        const startHour = start.hour();
+                                        const startMinute = start.minute();
+                                        const startSecond = start.second();
+
+                                        return {
+                                            disabledHours: () => buildRange(startHour),
+                                            disabledMinutes: (selectedHour) =>
+                                                selectedHour === startHour ? buildRange(startMinute) : [],
+                                            disabledSeconds: (selectedHour, selectedMinute) =>
+                                                selectedHour === startHour && selectedMinute === startMinute
+                                                    ? buildRange(startSecond)
+                                                    : [],
+                                        };
+                                    }}/>
                             </Form.Item>
                         </Col>
                     </Row>
@@ -940,6 +1076,7 @@ function Base() {
             <Modal
                 title="Редактирование задачи"
                 open={isEditTodoModalOpen}
+                centered
                 onCancel={() => {
                     setIsEditTodoModalOpen(false);
                     setSelectedTodo(null);
@@ -987,21 +1124,23 @@ function Base() {
                     <Row gutter={10}>
                         <Col span={12}>
                             <Form.Item
-                                label="Длительность (минуты)"
+                                label="Длительность (чч:мм)"
                                 name="estimatedDurationMinutes"
-                                rules={[{ required: true, message: 'Укажите длительность задачи' }]}
+                                rules={[validateDuration()]}
+                                getValueProps={(value) => ({ value: ensureDurationPickerValue(value) })}
                             >
-                                <InputNumber min={5} step={5} style={{ width: '100%' }} />
+                                <TimePicker
+                                    format="HH:mm"
+                                    minuteStep={5}
+                                    showNow={false}
+                                    style={{ width: '100%' }}
+                                />
                             </Form.Item>
                         </Col>
                         <Col span={12}>
                             <Form.Item label="Приоритет" name="priority">
                                 <Select
-                                    options={[
-                                        { label: 'Высокий', value: 0 },
-                                        { label: 'Средний', value: 1 },
-                                        { label: 'Низкий', value: 2 },
-                                    ]}
+                                    options={priorityLabels}
                                 />
                             </Form.Item>
                         </Col>
@@ -1024,18 +1163,41 @@ function Base() {
                                 name="earliestStart"
                                 rules={[{ required: true, message: 'Укажите время начала' }]}
                             >
-                                <DatePicker showTime format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
+                                <DatePicker format="DD.MM.YYYY" style={{ width: '100%' }} />
                             </Form.Item>
                         </Col>
                         <Col span={12}>
-                            <Form.Item label="Дедлайн" name="deadline">
-                                <DatePicker showTime format="DD.MM.YYYY HH:mm" style={{ width: '100%' }} />
+                            <Form.Item
+                                label="Дедлайн"
+                                name="deadline"
+                                dependencies={['earliestStart']}
+                                rules={[
+                                    validateNotBefore(
+                                        'earliestStart',
+                                        'Дедлайн не может быть раньше даты начала',
+                                        'day'
+                                    ),
+                                ]}
+                            >
+                                <DatePicker
+                                    showNow={false}
+                                    showTime
+                                    format="DD.MM.YYYY HH:mm"
+                                    style={{ width: '100%' }}
+                                    disabledDate={(current) => {
+                                        const start = editTodoForm.getFieldValue('earliestStart');
+                                        if (!start || !current) {
+                                            return false;
+                                        }
+                                        return current.startOf('day').isBefore(start.startOf('day'));
+                                    }}
+                                />
                             </Form.Item>
                         </Col>
                     </Row>
 
                     <Row gutter={10}>
-                        <Col span={24}>
+                        <Col span={12}>
                             <Form.Item label="Цвет" name="color">
                                 <Space size={10} wrap>
                                     {colorOptions.map((color) => (
@@ -1057,16 +1219,8 @@ function Base() {
                                 </Space>
                             </Form.Item>
                         </Col>
-                    </Row>
-
-                    <Row gutter={10}>
                         <Col span={12}>
-                            <Form.Item label="Можно делить" name="isSplittable" valuePropName="checked">
-                                <Switch />
-                            </Form.Item>
-                        </Col>
-                        <Col span={12}>
-                            <Form.Item label="Закрепить" name="isPinned" valuePropName="checked">
+                            <Form.Item extra="Задачу можно разделить на несколько мелких" label="Можно делить" name="isSplittable" valuePropName="checked">
                                 <Switch />
                             </Form.Item>
                         </Col>

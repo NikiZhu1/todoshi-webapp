@@ -6,6 +6,7 @@ import interactionPlugin from '@fullcalendar/interaction';
 import iCalendarPlugin from '@fullcalendar/icalendar'
 import googleCalendarPlugin from '@fullcalendar/google-calendar';
 import { Spin, Card } from 'antd';
+import { useMemo } from 'react';
 
 function ScheduleCalendar({
     calendarRef,
@@ -19,7 +20,7 @@ function ScheduleCalendar({
 }) {
 
     //Подготавливаем задачи пользователя для вставки в календарь
-    const events = (tasks ?? [])
+    const events = useMemo(() => (tasks ?? [])
         .map((task) => ({
             id: String(task?.id),
             title: task?.task?.title ?? `Задача #${task?.task?.taskId}`,
@@ -34,7 +35,7 @@ function ScheduleCalendar({
                 isPinned: Boolean(task?.task?.isPinned),
             },
         }))
-        .filter((event) => Boolean(event.start));
+        .filter((event) => Boolean(event.start)), [tasks]);
     
     //Отображение на календаре временного плана по умолчанию
     const getBusinessHours = (plan) => {
@@ -115,6 +116,10 @@ function ScheduleCalendar({
         }).filter(Boolean);
     };
 
+    const calendarSources = useMemo(() => buildCalendarSources(userCalendars), [userCalendars]);
+    const businessHours = useMemo(() => getBusinessHours(defaultPlan), [defaultPlan]);
+    const eventSources = useMemo(() => [events, ...calendarSources], [events, calendarSources]);
+
     return (
         <Card
             style={{
@@ -130,58 +135,57 @@ function ScheduleCalendar({
                     <Spin />
                 </div>
             ) : (
-                <FullCalendar
-                    ref={calendarRef}
-                    plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin, iCalendarPlugin, googleCalendarPlugin  ]}
-                    locale='ru'
-                    timeZone='local'
-                    firstDay='1'
-                    nowIndicator={true}
-                    editable
-                    eventStartEditable
-                    eventDurationEditable
-                    initialView="timeGridWeek"
-                    height='100%'
-                    // Получаем гугл апи ключ из env файла. 
-                    // При создании апи ключа указаны домены, которые могут использовать этот ключ, 
-                    // поэтому при дальнейшем развёртывании можно указать домен
-                    // и даже если ключ найдут, то доступа к нему не будет.
-                    googleCalendarApiKey={process.env.REACT_APP_GOOGLE_API_KEY}
-                    eventSources={[
-                        events, 
-                        ...buildCalendarSources(userCalendars)
-                    ]}
-                    headerToolbar={{
-                        left: 'prev,next today',
-                        center: 'title',
-                        right: 'dayGridMonth,timeGridWeek,listMonth',
-                    }}
-                    buttonText={{
-                        today:    'Сегодня',
-                        month:    'Месяц',
-                        week:     'Неделя',
-                        day:      'День',
-                        list:     'Список'
-                    }}
-                    businessHours={getBusinessHours(defaultPlan)}
-                    eventDrop={onEventDrop}
-                    eventResize={onEventResize}
-                    eventClick={onEventClick}
-                    eventDidMount={(info) => {
-                        if (info.event.extendedProps?.isPinned) {
-                            const el = info.el;
+                <div className="main-schedule-calendar" style={{height: '-webkit-fill-available'}}>
+                    <FullCalendar
+                        ref={calendarRef}
+                        plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin, iCalendarPlugin, googleCalendarPlugin  ]}
+                        locale='ru'
+                        timeZone='local'
+                        firstDay='1'
+                        nowIndicator={true}
+                        editable
+                        eventStartEditable
+                        eventDurationEditable
+                        initialView="timeGridWeek"
+                        height='100%'
+                        // Получаем гугл апи ключ из env файла. 
+                        // При создании апи ключа указаны домены, которые могут использовать этот ключ, 
+                        // поэтому при дальнейшем развёртывании можно указать домен
+                        // и даже если ключ найдут, то доступа к нему не будет.
+                        googleCalendarApiKey={process.env.REACT_APP_GOOGLE_API_KEY}
+                        eventSources={eventSources}
+                        headerToolbar={{
+                            left: 'prev,next today',
+                            center: 'title',
+                            right: 'dayGridMonth,timeGridWeek,listMonth',
+                        }}
+                        buttonText={{
+                            today:    'Сегодня',
+                            month:    'Месяц',
+                            week:     'Неделя',
+                            day:      'День',
+                            list:     'Список'
+                        }}
+                        businessHours={businessHours}
+                        eventDrop={onEventDrop}
+                        eventResize={onEventResize}
+                        eventClick={onEventClick}
+                        eventDidMount={(info) => {
+                            if (info.event.extendedProps?.isPinned) {
+                                const el = info.el;
 
-                            // акцентная рамка
-                            el.style.borderLeft = '4px solid #232323';
+                                // акцентная рамка
+                                el.style.borderLeft = '4px solid #232323';
 
-                            // лёгкая тень
-                            el.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.15)';
+                                // лёгкая тень
+                                el.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.15)';
 
-                            // чуть плотнее
-                            el.style.fontWeight = '700';
-                        }
-                    }}
-                />
+                                // чуть плотнее
+                                el.style.fontWeight = '700';
+                            }
+                        }}
+                    />
+                </div>
             )}
         </Card>
     );

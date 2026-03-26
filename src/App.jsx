@@ -2,6 +2,9 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Outlet } from 'react-router-dom';
 import { ConfigProvider } from 'antd';
 import ruRU from 'antd/locale/ru_RU';
+import dayjs from 'dayjs';
+import updateLocale from 'dayjs/plugin/updateLocale';
+import 'dayjs/locale/ru';
 import Base from './Pages/Base';
 
 import Login from './Pages/Login';
@@ -10,6 +13,10 @@ import DayBoundsSetup from './Pages/DayBoundsSetup';
 import TimePlans from './Pages/TimePlans';
 import Calendars from './Pages/Calendars';
 import MainTopBar from './Components/MainTopBar';
+
+dayjs.extend(updateLocale);
+dayjs.updateLocale('ru', { weekStart: 1 });
+dayjs.locale('ru');
 
 function AppShell() {
   return (

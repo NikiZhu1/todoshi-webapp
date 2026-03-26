@@ -17,7 +17,7 @@ import {
     Typography,
     message,
 } from 'antd';
-import { ArrowLeftOutlined, DeleteOutlined, PlusOutlined, SaveOutlined } from '@ant-design/icons';
+import { CloseOutlined, DeleteOutlined, PlusOutlined, SaveOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 
 import { useTimePlans } from '../Hooks/useTimePlans';
@@ -81,6 +81,7 @@ function TimePlans() {
     const [selectedPlanId, setSelectedPlanId] = useState(null);
     const [selectedPlanName, setSelectedPlanName] = useState('');
     const [dayDrafts, setDayDrafts] = useState({});
+    const [isSaving, setIsSaving] = useState(false);
 
     const {
         loading: plansLoading,
@@ -95,11 +96,12 @@ function TimePlans() {
         loading: slotsLoading,
         createSlot,
         updateSlot,
+        deleteSlot,
     } = useTimeSlots();
 
     const { GetUserIdFromJWT } = useUsers();
 
-    const loading = plansLoading || slotsLoading;
+    const loading = plansLoading || slotsLoading || isSaving;
 
     const selectedPlan = useMemo(
         () => (userPlans ?? []).find((plan) => plan.id === selectedPlanId) ?? null,
@@ -177,25 +179,16 @@ function TimePlans() {
         }
     };
 
-    const handleSavePlanName = async () => {
-        if (!selectedPlan) {
+    const handleDeleteDaySlotDraft = (dayOfWeek) => {
+        const currentDraft = dayDrafts[dayOfWeek] ?? { slotId: null, startTime: null, endTime: null };
+        if (!currentDraft.startTime && !currentDraft.endTime && !currentDraft.slotId) {
             return;
         }
 
-        const name = selectedPlanName.trim();
-        if (!name) {
-            message.error('Название плана не может быть пустым');
-            return;
-        }
-
-        try {
-            await updatePlan(selectedPlan.id, { name });
-            await refreshPlans();
-            message.success('Название плана обновлено');
-        } catch (error) {
-            console.error('Ошибка обновления плана:', error);
-            message.error('Не удалось обновить название плана');
-        }
+        updateDayDraft(dayOfWeek, {
+            startTime: null,
+            endTime: null,
+        });
     };
 
     const handleDeletePlan = async (plan) => {
@@ -224,37 +217,105 @@ function TimePlans() {
         }));
     };
 
-    const handleSaveDay = async (dayOfWeek) => {
+    const handleSavePlan = async () => {
         if (!selectedPlan) {
             return;
         }
 
-        const draft = dayDrafts[dayOfWeek];
-        if (!draft?.startTime || !draft?.endTime) {
-            message.warning('Для сохранения укажите время начала и окончания');
+        const name = selectedPlanName.trim();
+        if (!name) {
+            message.error('Название плана не может быть пустым');
+            return;
+        }
+
+        const originalDrafts = buildDayDrafts(selectedPlan);
+        const nameChanged = (selectedPlan.name ?? '') !== name;
+
+        for (const day of weekDays) {
+            const draft = dayDrafts[day.value] ?? { slotId: null, startTime: null, endTime: null };
+            const hasStart = Boolean(draft.startTime);
+            const hasEnd = Boolean(draft.endTime);
+
+            if (hasStart !== hasEnd) {
+                message.warning(`Для дня "${day.label}" укажите и начало, и конец слота`);
+                return;
+            }
+
+            if (hasStart && hasEnd) {
+                const start = toTimeValue(draft.startTime);
+                const end = toTimeValue(draft.endTime);
+                if (!start || !end || !end.isAfter(start)) {
+                    message.warning(`Для дня "${day.label}" время окончания должно быть позже начала`);
+                    return;
+                }
+            }
+        }
+
+        const hasSlotChanges = weekDays.some((day) => {
+            const draft = dayDrafts[day.value] ?? { slotId: null, startTime: null, endTime: null };
+            const original = originalDrafts[day.value] ?? { slotId: null, startTime: null, endTime: null };
+
+            return (
+                draft.slotId !== original.slotId ||
+                draft.startTime !== original.startTime ||
+                draft.endTime !== original.endTime
+            );
+        });
+
+        if (!nameChanged && !hasSlotChanges) {
+            message.info('Изменений нет');
             return;
         }
 
         try {
-            if (draft.slotId) {
-                await updateSlot(draft.slotId, {
-                    dayOfWeek,
-                    startTime: draft.startTime,
-                    endTime: draft.endTime,
-                });
-            } else {
-                await createSlot(selectedPlan.id, {
-                    dayOfWeek,
-                    startTime: draft.startTime,
-                    endTime: draft.endTime,
-                });
+            setIsSaving(true);
+
+            if (nameChanged) {
+                await updatePlan(selectedPlan.id, { name });
+            }
+
+            for (const day of weekDays) {
+                const draft = dayDrafts[day.value] ?? { slotId: null, startTime: null, endTime: null };
+                const original = originalDrafts[day.value] ?? { slotId: null, startTime: null, endTime: null };
+
+                const isChanged =
+                    draft.slotId !== original.slotId ||
+                    draft.startTime !== original.startTime ||
+                    draft.endTime !== original.endTime;
+
+                if (!isChanged) {
+                    continue;
+                }
+
+                if (draft.startTime && draft.endTime) {
+                    if (draft.slotId) {
+                        await updateSlot(draft.slotId, {
+                            dayOfWeek: day.value,
+                            startTime: draft.startTime,
+                            endTime: draft.endTime,
+                        });
+                    } else {
+                        await createSlot(selectedPlan.id, {
+                            dayOfWeek: day.value,
+                            startTime: draft.startTime,
+                            endTime: draft.endTime,
+                        });
+                    }
+                    continue;
+                }
+
+                if (draft.slotId) {
+                    await deleteSlot(draft.slotId);
+                }
             }
 
             await refreshPlans();
-            message.success('Слот сохранён');
+            message.success('План и слоты сохранены');
         } catch (error) {
-            console.error('Ошибка сохранения слота:', error);
-            message.error('Не удалось сохранить слот');
+            console.error('Ошибка сохранения плана и слотов:', error);
+            message.error('Не удалось сохранить изменения');
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -301,22 +362,6 @@ function TimePlans() {
                                         }}
                                         actions={[
                                             plan.isDefault ? <Tag key="default" color="blue">По умолчанию</Tag> : null,
-                                            !plan.isDefault ? (
-                                                <Popconfirm
-                                                    key="delete"
-                                                    title="Удалить план?"
-                                                    onConfirm={() => handleDeletePlan(plan)}
-                                                    okText="Удалить"
-                                                    cancelText="Отмена"
-                                                >
-                                                    <Button
-                                                        type="text"
-                                                        danger
-                                                        icon={<DeleteOutlined />}
-                                                        onClick={(e) => e.stopPropagation()}
-                                                    />
-                                                </Popconfirm>
-                                            ) : null,
                                         ].filter(Boolean)}
                                     >
                                         <Text strong={plan.id === selectedPlanId}>{plan.name}</Text>
@@ -335,30 +380,39 @@ function TimePlans() {
                             <Space direction="vertical" size={12} style={{ width: '100%', height: '100%' }}>
                                 <Space style={{ width: '100%', justifyContent: 'space-between' }}>
                                     <Title level={4} style={{ margin: 0 }}>
-                                        Настройка слотов
+                                        Настройка плана
                                     </Title>
-                                    {selectedPlan.isDefault ? <Tag color="blue">План по умолчанию</Tag> : null}
+                                    <Button
+                                        type="primary"
+                                        icon={<SaveOutlined />}
+                                        loading={loading}
+                                        onClick={handleSavePlan}
+                                    >
+                                        Применить изменения
+                                    </Button>
                                 </Space>
 
-                                <Space.Compact style={{ width: '100%' }}>
+                                <Space orientation="vertical" style={{ width: '100%' }}>
+                                    <Text type='secondary'>Название плана</Text>
                                     <Input
                                         value={selectedPlanName}
                                         onChange={(e) => setSelectedPlanName(e.target.value)}
                                         placeholder="Название плана"
+                                        // size='large'
                                     />
-                                    <Button icon={<SaveOutlined />} onClick={handleSavePlanName}>
-                                        Сохранить название
-                                    </Button>
-                                </Space.Compact>
+                                </Space>
 
                                 <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
-                                    <Space direction="vertical" size={10} style={{ width: '100%' }}>
+                                    <Space orientation="vertical" size={10} style={{ width: '100%' }}>
+                                        <Text type='secondary'>Настройка слотов</Text>
                                         {weekDays.map((day) => {
                                             const draft = dayDrafts[day.value] ?? {
                                                 slotId: null,
                                                 startTime: null,
                                                 endTime: null,
                                             };
+                                            const hasSlot = Boolean(draft.startTime && draft.endTime);
+                                            const canDelete = Boolean(draft.startTime || draft.endTime || draft.slotId);
 
                                             return (
                                                 <div
@@ -369,14 +423,18 @@ function TimePlans() {
                                                         gap: 10,
                                                         alignItems: 'center',
                                                         padding: 10,
-                                                        border: '1px solid #f0f0f0',
+                                                        border: hasSlot ? '1px solid #f0f0f0' : '1px solid #d9d9d9',
                                                         borderRadius: 8,
+                                                        backgroundColor: hasSlot ? '#ffffff' : '#f5f5f5',
                                                     }}
                                                 >
                                                     <Text strong style={{ minWidth: 170 }}>{day.label}</Text>
                                                     <TimePicker
                                                         style={{ minWidth: 130, flex: '1 1 130px' }}
                                                         format="HH:mm"
+                                                        placeholder="Начало"
+                                                        minuteStep='5'
+                                                        showNow={false}
                                                         value={toTimeValue(draft.startTime)}
                                                         onChange={(value) =>
                                                             updateDayDraft(day.value, {
@@ -387,6 +445,9 @@ function TimePlans() {
                                                     <TimePicker
                                                         style={{ minWidth: 130, flex: '1 1 130px' }}
                                                         format="HH:mm"
+                                                        placeholder="Конец"
+                                                        minuteStep='5'
+                                                        showNow={false}
                                                         value={toTimeValue(draft.endTime)}
                                                         onChange={(value) =>
                                                             updateDayDraft(day.value, {
@@ -394,14 +455,40 @@ function TimePlans() {
                                                             })
                                                         }
                                                     />
-                                                    <Button onClick={() => handleSaveDay(day.value)}>
-                                                        Сохранить
+                                                    <Button
+                                                        danger
+                                                        icon={<CloseOutlined />}
+                                                        disabled={!canDelete}
+                                                        onClick={() => handleDeleteDaySlotDraft(day.value)}
+                                                    >
                                                     </Button>
                                                 </div>
                                             );
                                         })}
                                     </Space>
                                 </div>
+                                <Text type='secondary'>Удаление плана</Text>
+                                {selectedPlan.isDefault ? 
+                                    <Text>Данный план по умолчанию, его невозможно удалить</Text> 
+                                    : (
+                                        <Flex vertical gap='8px'>
+                                        <Text>{`При удалении плана все задачи, которые связаны с ним,\n назначатся на план по умолчанию`}</Text>
+                                        <Popconfirm
+                                            key="delete"
+                                            title="Удалить план?"
+                                            onConfirm={() => handleDeletePlan(selectedPlan)}
+                                            okText="Удалить"
+                                            cancelText="Отмена"
+                                        >
+                                            <Button
+                                                style={{width: 'fit-content'}}
+                                                danger
+                                                icon={<DeleteOutlined />}
+                                                onClick={(e) => e.stopPropagation()}
+                                            >Удалить план</Button>
+                                        </Popconfirm>
+                                        </Flex>
+                                    )}
                             </Space>
                         )}
                     </Card>
